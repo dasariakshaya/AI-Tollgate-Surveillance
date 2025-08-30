@@ -1,0 +1,118 @@
+# ===================================================================
+# ENHANCED DRIVING LICENSE EXTRACTOR - REQUIREMENTS
+# Python Version: 3.11.9
+# Last Updated: August 2025
+# ===================================================================
+
+# Core Scientific Computing Stack
+numpy>=1.26.4,<2.0.0
+scipy>=1.11.4,<1.15.0
+pandas>=2.2.2,<3.0.0
+matplotlib>=3.8.4,<4.0.0
+
+# Image Processing Libraries
+Pillow>=10.4.0,<11.0.0
+opencv-python>=4.10.0.84,<5.0.0
+scikit-image>=0.24.0,<1.0.0
+imageio>=2.34.2,<3.0.0
+
+# Machine Learning & Deep Learning
+torch>=2.4.0,<3.0.0
+torchvision>=0.19.0,<1.0.0
+scikit-learn>=1.5.1,<2.0.0
+
+# OCR Libraries (Core Components)
+easyocr>=1.7.2,<2.0.0
+paddleocr>=2.9.1,<3.0.0
+paddlepaddle>=2.6.1,<3.0.0
+
+# Transformers & NLP for TrOCR
+transformers>=4.44.2,<5.0.0
+tokenizers>=0.19.1,<1.0.0
+sentencepiece>=0.2.0,<1.0.0
+accelerate>=0.33.0,<1.0.0
+
+# Computer Vision & Object Detection
+ultralytics>=8.2.73,<9.0.0
+supervision>=0.22.0,<1.0.0
+
+# Text Processing & Pattern Matching
+regex>=2024.7.24
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.25.1
+
+# Data Handling & Export
+openpyxl>=3.1.5,<4.0.0
+xlsxwriter>=3.2.0,<4.0.0
+python-dateutil>=2.9.0.post0,<3.0.0
+
+# Progress Bars & CLI Enhancements
+tqdm>=4.66.5,<5.0.0
+rich>=13.7.1,<14.0.0
+click>=8.1.7,<9.0.0
+
+# Image Enhancement & Preprocessing
+albumentations>=1.4.14,<2.0.0
+imgaug>=0.4.0,<1.0.0
+
+# Logging & Configuration
+loguru>=0.7.2,<1.0.0
+pyyaml>=6.0.2,<7.0.0
+python-dotenv>=1.0.1,<2.0.0
+
+# Performance & Memory Management
+psutil>=6.0.0,<7.0.0
+memory-profiler>=0.61.0,<1.0.0
+
+# HTTP & API (for potential future enhancements)
+requests>=2.32.3,<3.0.0
+aiohttp>=3.10.2,<4.0.0
+
+# Development & Testing (Optional - can be moved to dev-requirements.txt)
+pytest>=8.3.2,<9.0.0
+pytest-cov>=5.0.0,<6.0.0
+black>=24.8.0,<25.0.0
+flake8>=7.1.1,<8.0.0
+mypy>=1.11.1,<2.0.0
+
+# GPU Acceleration Support (Optional - uncomment if using CUDA)
+# torch-audio>=2.4.0,<3.0.0  # For audio processing if needed
+# torchtext>=0.18.0,<1.0.0   # For advanced text processing
+
+# Additional OCR Support (Optional)
+# pytesseract>=0.3.10,<1.0.0  # Tesseract OCR integration
+# pdf2image>=1.17.0,<2.0.0    # PDF to image conversion
+
+# ===================================================================
+# PLATFORM-SPECIFIC INSTALLATIONS
+# ===================================================================
+# For Windows users, you might need:
+# python-magic-bin>=0.4.14  # File type detection
+
+# For Linux/Mac users:
+# python-magic>=0.4.27      # File type detection
+
+# ===================================================================
+# INSTALLATION NOTES
+# ===================================================================
+# 1. Install PyTorch with CUDA support (if available):
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# 2. For ARM-based Macs (Apple Silicon):
+#    Some packages might need specific versions
+#
+# 3. If you encounter issues with PaddlePaddle:
+#    pip install paddlepaddle -i https://pypi.org/simple/
+#
+# 4. For development setup:
+#    pip install -e .
+#    pip install -r requirements-dev.txt
+
+# ===================================================================
+# VERSION CONSTRAINTS EXPLANATION
+# ===================================================================
+# - numpy: Pinned to 1.26.x for stability with OpenCV and scikit-image
+# - torch: Latest stable version with Python 3.11 support
+# - transformers: Latest version for TrOCR improvements
+# - opencv-python: Latest version for enhanced image processing
+# - All versions tested with Python 3.11.9

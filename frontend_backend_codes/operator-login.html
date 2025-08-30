@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Operator Login - Calypso</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <img src="indian-emblem.png" alt="Parivahan Logo" class="logo" />
+      <div class="header-text">
+        <h3>Government of India</h3>
+        <h1>MINISTRY OF ROAD TRANSPORT & HIGHWAYS</h1>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN FORM -->
+  <div class="login-container">
+    <form class="login-box" id="loginForm">
+      <h2>Operator Login</h2>
+
+      <div class="input-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Enter email" required />
+      </div>
+
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter password" required />
+        <div class="checkbox-group">
+          <input type="checkbox" id="showPassword" />
+          <label for="showPassword">Show Password</label>
+        </div>
+      </div>
+
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById("showPassword").addEventListener("change", function () {
+      const pwd = document.getElementById("password");
+      pwd.type = this.checked ? "text" : "password";
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        const res = await fetch("http://localhost:3000/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          // Store user info in localStorage
+          localStorage.setItem("userRole", data.role);
+          localStorage.setItem("userId", data.userId);
+          localStorage.setItem("userName", data.name || "User");
+
+          alert("✅ Login successful!");
+          window.location.href = "scan.html";
+        } else {
+          alert(data.message || "Login failed");
+        }
+      } catch (err) {
+        console.error("Login Error:", err);
+        alert("Something went wrong");
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "dl_numbers": [
+    "MH0320080022135"
+  ],
+  "name": "BABU KHAN gettyimages S",
+  "father_name": null,
+  "address": null,
+  "dob": "09/03/2011",
+  "issue_date": null,
+  "valid_until": null,
+  "vehicle_classes": [
+    "LMV",
+    "TRANS"
+  ],
+  "raw_text": "THE UNIONOFINDIA MAHARASHTRA STATE MOTOR DRIVING LICENCE DMH0320080022135 D24-01-2007 09-03-2011 (TR AED15.03-2008 FORMT AUTHORISATONTODRIVEFOLLOWING CLASS RULE16(2) QFVEHICLESTHROUGHOUTINDIA COv DO MOWG 24.01-2007 LMV 24-01-2007 TRANS 10-03-2008 DOB 01-12-1987 Name BABU KHAN gettyimages S/DWOJABBAR KHAN CreditHindustan Times AJd KAMLA RAMAN NAGARBAIGANWADI GOVANDI,MUMBAL. BDBUFHAN PIN400043 Sgnature&Dof Signature/Thumb eg Aulbonity MH032008261 Impression.ofHolder 812001522",
+  "confidence_scores": {
+    "easyocr": 0.32711216310053914
+  },
+  "extraction_timestamp": "2025-08-27T22:35:56.800485"
+}

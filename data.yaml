@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['license_plate']
+
+roboflow:
+  workspace: computer-vision-54x0b
+  project: indian-number-plates-4ve8f
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/computer-vision-54x0b/indian-number-plates-4ve8f/dataset/4

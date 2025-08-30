@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+onnxruntime-gpu
+easyocr
+numpy
+opencv-python-headless
+python-multipart

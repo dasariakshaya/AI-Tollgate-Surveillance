@@ -1,2 +1,12 @@
 .vscode/
 node_modules/
+# Ignore virtual environment
+DL_Extractor_model/dl_env311/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+*.sqlite3

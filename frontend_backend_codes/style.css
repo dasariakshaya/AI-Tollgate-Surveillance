@@ -1,0 +1,119 @@
+/* GLOBAL */
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: #f5f9ff;
+  color: #1a1a1a;
+}
+
+/* HEADER (Shared with index.html) */
+.header {
+  background-color: #ffffff;
+  padding: 15px 30px;
+  border-bottom: 3px solid #1a237e;
+  display: flex;
+  align-items: center;
+  justify-content: start;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.logo {
+  height: 60px;
+}
+
+.header-text h1 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.header-text h3 {
+  font-size: 14px;
+  margin: 0;
+  color: #4a4a4a;
+}
+
+/* LOGIN FORM */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 100px);
+  background: linear-gradient(to bottom right, #f0f6ff, #ffffff);
+  padding: 30px;
+}
+
+.login-box {
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 45, 114, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-box h2 {
+  margin-bottom: 20px;
+  color: #1a237e;
+  text-align: center;
+}
+
+.input-group {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group label {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.input-group input {
+  padding: 10px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  transition: border 0.3s;
+}
+
+.input-group input:focus {
+  border-color: #1a237e;
+  outline: none;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.checkbox-group input {
+  width: 16px;
+  height: 16px;
+}
+
+button {
+  background-color: #1a237e;
+  color: #fff;
+  padding: 12px;
+  width: 100%;
+  border: none;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background-color: #0f1651;
+}

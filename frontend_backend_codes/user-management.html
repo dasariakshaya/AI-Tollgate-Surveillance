@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Management - Calypso</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    /* Base Styles - Synchronized across all files */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #f0f4f9, #ffffff);
+      color: #1a1a1a;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* Sidebar - Synchronized across all files */
+    .sidebar {
+      width: 220px;
+      background-color: #1a237e;
+      color: white;
+      height: 100vh;
+      position: fixed;
+      transition: all 0.3s ease;
+      padding-top: 60px;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      z-index: 20;
+    }
+    .sidebar.collapsed { width: 60px; }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar li {
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .sidebar li:hover,
+    .sidebar li.active {
+      background-color: #0f1651;
+    }
+    .sidebar li a {
+        color: inherit;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        height: 100%;
+    }
+    .sidebar.collapsed li span { display: none; }
+    .sidebar i { font-size: 18px; }
+
+    /* Main Container - Synchronized across all files */
+    .main-container {
+      margin-left: 220px;
+      width: calc(100% - 220px);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .collapsed + .main-container {
+      margin-left: 60px;
+      width: calc(100% - 60px);
+    }
+
+    /* Header - Synchronized across all files */
+    .header {
+      background-color: #ffffff;
+      padding: 16px 32px;
+      border-bottom: 3px solid #1a237e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo { height: 60px; }
+
+    .header-text h3 {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .header-text h1 {
+      font-size: 18px;
+      color: #1a237e;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .header-right i,
+    .toggle-btn {
+      font-size: 20px;
+      color: #1a237e;
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+    .toggle-btn { margin-right: 16px; }
+    .header-right i:hover,
+    .toggle-btn:hover { color: #0f1651; }
+
+
+    /* Main Content Area (Common for all pages) */
+    main {
+      padding: 40px 30px; /* Consistent padding */
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;
+    }
+
+    /* Glass Card Effect (Common for all pages) */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 30px 40px; /* Consistent padding */
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      color: #1a1a1a;
+      width: 100%;
+      max-width: 1200px;
+      overflow-x: auto; /* Allow horizontal scroll for tables/forms if too wide */
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start; /* Align contents to the left within the card */
+    }
+
+    .glass-card h2 {
+      text-align: center;
+      color: #1a237e;
+      font-size: 24px; /* Consistent heading size */
+      font-weight: 700;
+      margin-bottom: 25px; /* Consistent margin */
+      width: 100%; /* Ensure heading takes full width for centering */
+    }
+
+    /* Buttons (Common) */
+    .btn {
+      background-color: #1a237e;
+      color: white;
+      padding: 10px 14px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      flex-shrink: 0;
+    }
+    .btn:hover { background-color: #0f1651; }
+    .btn.active-btn {
+        background-color: #0f1651;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Form Elements (Common) */
+    input[type="file"],
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select {
+      padding: 10px 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #1a237e;
+      box-shadow: 0 0 5px rgba(26, 35, 126, 0.2);
+    }
+
+    /* Table Styling (Common for log and management tables) */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    th,
+    td {
+      padding: 15px 20px;
+      border: 1px solid #e0e0e0;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      background-color: #1a237e;
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Zebra striping for table rows */
+    tbody tr:nth-child(even) {
+      background-color: #f8fbfc;
+    }
+
+    tbody tr:hover {
+      background-color: #eef2f7;
+      cursor: pointer;
+    }
+
+    /* Status Colors (Common) */
+    .status-active,
+    .status-valid,
+    .alert-valid {
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .status-inactive,
+    .status-blacklisted,
+    .alert-blacklisted,
+    .alert-suspicious {
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    .status-not_found,
+    .alert-not_found {
+      color: #ffc107;
+      font-weight: bold;
+    }
+
+    .status-no_data_provided {
+      color: #6c757d;
+      font-weight: normal;
+    }
+
+    .status-normal {
+      color: #1a1a1a;
+    }
+
+    /* Specific styles for user-management.html */
+    main.verification-container {
+      max-height: calc(100vh - 100px);
+    }
+
+    /* Styles for aligning heading and button */
+    .header-with-button {
+      display: flex;
+      justify-content: flex-start; /* Aligns items to the start (left) */
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 20px; /* Space between heading and button */
+      flex-wrap: wrap;
+      width: 100%; /* Ensure it takes full width to align content */
+    }
+
+    .header-with-button h2 {
+      margin-bottom: 0;
+      white-space: nowrap;
+      text-align: left; /* Ensure text is aligned left within its own space */
+      width: auto; /* Allow h2 to size based on content, not 100% */
+    }
+
+    /* User Table specific alignments */
+    .user-table th, .user-table td {
+        text-align: center; /* Override left align for user table */
+    }
+
+    /* Adjust specific column widths */
+    .user-table th:nth-child(1), .user-table td:nth-child(1) { /* User ID */
+        min-width: 100px;
+    }
+    .user-table th:nth-child(2), .user-table td:nth-child(2) { /* Name */
+        min-width: 150px;
+    }
+    .user-table th:nth-child(3), .user-table td:nth-child(3) { /* Email */
+        min-width: 200px;
+    }
+    .user-table th:nth-child(5), .user-table td:nth-child(5) { /* Login Time */
+        min-width: 140px;
+    }
+    .user-table th:nth-child(6), .user-table td:nth-child(6) { /* Logout Time */
+        min-width: 140px;
+    }
+    .user-table th:nth-child(8), .user-table td:nth-child(8) { /* Action */
+        width: 80px; /* Ensure enough space for "Delete" */
+    }
+
+    /* Responsive adjustments - Synchronized base */
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; padding-top: 15px; }
+      .sidebar ul { padding-top: 20px;}
+      .sidebar li { flex-direction: column; text-align: center; gap: 5px; padding: 10px 5px;}
+      .sidebar li span { display: none; }
+      .sidebar i { margin-right: 0; }
+
+      .main-container { margin-left: 60px; width: calc(100% - 60px); }
+      .header { padding: 10px 15px; }
+      .header-left .logo { height: 40px; }
+      .header-text h3, .header-text h1 { display: none; }
+      .toggle-btn { margin-right: 5px; }
+
+      main { padding: 15px; }
+      .glass-card { padding: 20px; border-radius: 10px; min-width: unset; width: 95%; }
+      .glass-card h2 { font-size: 20px; margin-bottom: 15px; }
+
+      .header-with-button { /* Specific for user-management.html on small screens */
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .header-with-button button {
+        margin-top: 0;
+      }
+      table { font-size: 12px; }
+      th, td { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <ul>
+      <li><i class="material-icons">home</i><a href="scan.html"><span>Home</span></a></li>
+      <li class="active" id="userManagementLink"><i class="material-icons">group</i><a href="user-management.html"><span>User Management</span></a></li>
+      <li id="vehicleLogsLink"><i class="material-icons">directions_car</i><a href="vehicle-logs.html"><span>Vehicle Logs</span></a></li>
+      <li id="alertLogsLink"><i class="material-icons">warning</i><a href="alert-logs.html"><span>Alert Logs</span></a></li>
+      <li id="blacklistManagementLink"><i class="material-icons">block</i><a href="blacklist-management.html"><span>Blacklist Management</span></a></li>
+      <li><i class="material-icons">settings</i><span>Settings</span></li>
+    </ul>
+  </div>
+
+  <div class="main-container" id="mainContainer">
+    <div class="header">
+      <div class="header-left">
+        <span class="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></span>
+        <img src="indian-emblem.png" alt="Government Emblem" class="logo" />
+        <div class="header-text">
+          <h3>Government of India</h3>
+          <h1>Ministry of Road Transport & Highways</h1>
+        </div>
+      </div>
+      <div class="header-right">
+        <i class="fas fa-cog" title="Settings"></i>
+        <i class="fas fa-user-circle" title="Profile"></i>
+        <i class="fas fa-sign-out-alt" title="Logout" onclick="logoutUser()" style="cursor:pointer;"></i>
+      </div>
+    </div>
+
+    <main class="verification-container">
+      <div class="glass-card">
+        <div class="header-with-button">
+          <h2><i class="fas fa-users-cog"></i> User Management</h2>
+          <button class="btn" onclick="openAddUserPrompt()"> Add User</button>
+        </div>
+
+        <table class="user-table" id="userTable">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Login Time</th>
+              <th>Logout Time</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Global functions for sidebar and logout
+    window.toggleSidebar = function () {
+      document.getElementById("sidebar").classList.toggle("collapsed");
+      document.getElementById("mainContainer").classList.toggle("collapsed");
+    };
+
+    window.logoutUser = function () {
+      const userId = localStorage.getItem("userId");
+      if (userId) {
+        fetch(`http://localhost:3000/api/logout/${userId}`, {
+          method: "POST"
+        })
+          .then(res => res.json())
+          .then(data => {
+            alert(data.message || "✅ Logged out");
+            localStorage.clear();
+            window.location.href = "index.html";
+          })
+          .catch(err => {
+            console.error("Logout error:", err);
+            alert("Logout failed");
+          });
+      } else {
+        localStorage.clear();
+        window.location.href = "index.html";
+      }
+    };
+
+    async function fetchUsers() {
+      try {
+        const res = await fetch("http://localhost:3000/api/users");
+        const users = await res.json();
+
+        const tableBody = document.querySelector("#userTable tbody");
+        tableBody.innerHTML = "";
+
+        users.forEach(user => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${user._id || '-'}</td>
+            <td>${user.name || '-'}</td>
+            <td>${user.email || '-'}</td>
+            <td>${user.role || '-'}</td>
+            <td>${user.loginTime ? new Date(user.loginTime).toLocaleString() : '-'}</td>
+            <td>${user.logoutTime ? new Date(user.logoutTime).toLocaleString() : '-'}</td>
+            <td><span class="${user.isActive ? 'status-active' : 'status-inactive'}">
+              ${user.isActive ? 'Active' : 'Inactive'}
+            </span></td>
+            <td>
+              <button onclick="deleteUser('${user._id}')" style="color:red; border:none; background:none; cursor:pointer; padding: 5px 10px;">
+                Delete
+              </button>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+      } catch (err) {
+        console.error("❌ Failed to load users:", err);
+        const tableBody = document.querySelector("#userTable tbody");
+        tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Error loading users. Please check server.</td></tr>`;
+      }
+    }
+
+    async function deleteUser(userId) {
+      if (!confirm("Are you sure you want to delete this user?")) return;
+      try {
+        const res = await fetch(`http://localhost:3000/api/users/${userId}`, {
+          method: 'DELETE'
+        });
+        const result = await res.json();
+        alert(result.message || "User deleted");
+        fetchUsers();
+      }
+      catch (err) {
+        console.error("Error deleting user:", err);
+        alert("Failed to delete user");
+      }
+    }
+
+    async function openAddUserPrompt() {
+      const name = prompt("Enter user's name:");
+      if (!name) return;
+      const email = prompt("Enter user's email:");
+      if (!email) return;
+      const password = prompt("Enter password for the user:");
+      if (!password) return;
+      const role = prompt("Enter role (e.g. admin, officer, superadmin):", "officer");
+      if (!role) return;
+
+      try {
+        const res = await fetch("http://localhost:3000/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password, role })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(data.message || "User added");
+            fetchUsers();
+        } else {
+            alert(data.message || "Failed to add user.");
+        }
+      } catch (err) {
+        console.error("Failed to add user:", err);
+        alert("Could not add user");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const role = localStorage.getItem("userRole");
+
+      // Role-based access control for this page
+      if (role !== "superadmin") {
+        alert("Access denied: Only superadmin can access this page.");
+        window.location.href = "scan.html";
+        return;
+      }
+
+      fetchUsers(); // Fetch users only if authorized
+
+      // Set active sidebar item based on current page path
+      const currentPath = window.location.pathname;
+      document.querySelectorAll('.sidebar li a').forEach(link => {
+        if (link.getAttribute('href') && currentPath.toLowerCase().includes(link.getAttribute('href').toLowerCase())) {
+          link.closest('li').classList.add('active');
+        } else {
+          link.closest('li').classList.remove('active');
+        }
+      });
+      const userManagementLi = document.getElementById('userManagementLink'); // Explicitly get this li
+      if (userManagementLi && currentPath.toLowerCase().includes('user-management.html')) {
+        userManagementLi.classList.add('active');
+      }
+
+
+      // Show/hide sidebar links based on role
+      const userManagementLink = document.getElementById("userManagementLink");
+      const vehicleLogsLink = document.getElementById("vehicleLogsLink");
+      const alertLogsLink = document.getElementById("alertLogsLink");
+      const blacklistManagementLink = document.getElementById("blacklistManagementLink");
+
+      if (userManagementLink) userManagementLink.style.display = (role === "superadmin") ? "flex" : "none";
+      if (vehicleLogsLink) vehicleLogsLink.style.display = (role === "superadmin" || role === "admin" || role === "officer") ? "flex" : "none";
+      if (alertLogsLink) alertLogsLink.style.display = (role === "superadmin" || role === "admin") ? "flex" : "none";
+      if (blacklistManagementLink) blacklistManagementLink.style.display = (role === "superadmin") ? "flex" : "none";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blacklist Management - Ministry of Road Transport</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <style>
+    /* Base Styles - Synchronized across all files */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #f0f4f9, #ffffff);
+      color: #1a1a1a;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* Sidebar - Synchronized across all files */
+    .sidebar {
+      width: 220px;
+      background-color: #1a237e;
+      color: white;
+      height: 100vh;
+      position: fixed;
+      transition: all 0.3s ease;
+      padding-top: 60px;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      z-index: 20;
+    }
+    .sidebar.collapsed { width: 60px; }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar li {
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .sidebar li:hover,
+    .sidebar li.active {
+      background-color: #0f1651;
+    }
+    .sidebar li a {
+        color: inherit;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        height: 100%;
+    }
+    .sidebar.collapsed li span { display: none; }
+    .sidebar i { font-size: 18px; }
+
+    /* Main Container - Synchronized across all files */
+    .main-container {
+      margin-left: 220px;
+      width: calc(100% - 220px);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .collapsed + .main-container {
+      margin-left: 60px;
+      width: calc(100% - 60px);
+    }
+
+    /* Header - Synchronized across all files */
+    .header {
+      background-color: #ffffff;
+      padding: 16px 32px;
+      border-bottom: 3px solid #1a237e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo { height: 60px; }
+
+    .header-text h3 {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .header-text h1 {
+      font-size: 18px;
+      color: #1a237e;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .header-right i,
+    .toggle-btn {
+      font-size: 20px;
+      color: #1a237e;
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+    .toggle-btn { margin-right: 16px; }
+    .header-right i:hover,
+    .toggle-btn:hover { color: #0f1651; }
+
+
+    /* Main Content Area (Common for all pages) */
+    main {
+      padding: 40px 30px;
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;
+    }
+
+    /* Glass Card Effect (Common for all pages) */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 30px 40px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      color: #1a1a1a;
+      width: 100%;
+      max-width: 1200px;
+      overflow-x: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .glass-card h2 {
+      text-align: center;
+      color: #1a237e;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 25px;
+      width: 100%;
+    }
+
+    /* Buttons (Common) */
+    .btn {
+      background-color: #1a237e;
+      color: white;
+      padding: 10px 14px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      flex-shrink: 0;
+    }
+    .btn:hover { background-color: #0f1651; }
+    .btn.active-btn {
+        background-color: #0f1651;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Form Elements (Common) */
+    input[type="file"],
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select {
+      padding: 10px 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #1a237e;
+      box-shadow: 0 0 5px rgba(26, 35, 126, 0.2);
+    }
+
+    /* Table Styling (Common for log and management tables) */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    th,
+    td {
+      padding: 15px 20px;
+      border: 1px solid #e0e0e0;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      background-color: #1a237e;
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+    #blacklistTable thead th {
+        background-color: #b71c1c; /* Distinct color for blacklist header */
+    }
+
+
+    /* Zebra striping for table rows */
+    tbody tr:nth-child(even) {
+      background-color: #f8fbfc;
+    }
+
+    tbody tr:hover {
+      background-color: #eef2f7;
+      cursor: pointer;
+    }
+
+    /* Status Colors (Common) */
+    .status-active,
+    .status-valid,
+    .alert-valid {
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .status-inactive,
+    .status-blacklisted,
+    .alert-blacklisted,
+    .alert-suspicious {
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    .status-not_found,
+    .alert-not_found {
+      color: #ffc107;
+      font-weight: bold;
+    }
+
+    .status-no_data_provided {
+      color: #6c757d;
+      font-weight: normal;
+    }
+
+    .status-normal {
+      color: #1a1a1a;
+    }
+
+    /* Pagination Controls (Common) */
+    .pagination-controls {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: 20px;
+        gap: 10px;
+        width: 100%;
+    }
+    .pagination-controls button {
+        padding: 8px 15px;
+        border: 1px solid #1a237e;
+        background-color: #fff;
+        color: #1a237e;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .pagination-controls button:hover:not(:disabled) {
+        background-color: #1a237e;
+        color: white;
+    }
+    .pagination-controls button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .pagination-controls span {
+        font-weight: bold;
+        color: #1a237e;
+    }
+
+
+    /* Specific styles for blacklist-management.html */
+    .switch-bar {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .switch-bar > div:first-child .btn:last-child {
+        margin-right: 0;
+    }
+
+
+    /* Form Inline for Add Entry */
+    .form-inline {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .form-inline input, .form-inline select {
+      /* Styles inherited from common_styles.css */
+    }
+    .form-inline input:focus, .form-inline select:focus {
+        /* Styles inherited from common_styles.css */
+    }
+
+
+    /* Responsive adjustments (synchronized with other pages) */
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; padding-top: 15px; }
+      .sidebar ul { padding-top: 20px;}
+      .sidebar li { flex-direction: column; text-align: center; gap: 5px; padding: 10px 5px;}
+      .sidebar li span { display: none; }
+      .sidebar i { margin-right: 0; }
+
+      .main-container { margin-left: 60px; width: calc(100% - 60px); }
+      .header { padding: 10px 15px; }
+      .header-left .logo { height: 40px; }
+      .header-text h3, .header-text h1 { display: none; }
+      .toggle-btn { margin-right: 5px; }
+
+      main { padding: 15px; }
+      .glass-card { padding: 20px; border-radius: 10px; min-width: unset; width: 95%; }
+      .glass-card h2 { font-size: 20px; margin-bottom: 15px; }
+
+      .switch-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+      .switch-bar > div { width: 100%; display: flex; flex-wrap: wrap; gap: 10px;}
+      .form-inline { flex-direction: column; width: 100%; gap: 10px;}
+      .form-inline input, .form-inline select, .form-inline .btn { width: 100%; }
+      .btn { margin-right: 0; }
+
+      table { font-size: 12px; }
+      th, td { padding: 10px 12px; }
+
+      .pagination-controls { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <ul>
+      <li><i class="material-icons">home</i><a href="scan.html"><span>Home</span></a></li>
+      <li id="userManagementLink"><i class="material-icons">group</i><a href="user-management.html"><span>User Management</span></a></li>
+      <li id="vehicleLogsLink"><i class="material-icons">directions_car</i><a href="vehicle-logs.html"><span>Vehicle Logs</span></a></li>
+      <li id="alertLogsLink"><i class="material-icons">warning</i><a href="alert-logs.html"><span>Alert Logs</span></a></li>
+      <li class="active" id="blacklistManagementLink"><i class="material-icons">block</i><span>Blacklist Management</span></li>
+      <li><i class="material-icons">settings</i><span>Settings</span></li>
+    </ul>
+  </div>
+
+  <div class="main-container" id="mainContainer">
+    <div class="header">
+      <div class="header-left">
+        <span class="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></span>
+        <img src="indian-emblem.png" alt="Government Emblem" class="logo" />
+        <div class="header-text">
+          <h3>Government of India</h3>
+          <h1>Ministry of Road Transport & Highways</h1>
+        </div>
+      </div>
+      <div class="header-right">
+        <i class="fas fa-cog" title="Settings"></i>
+        <i class="fas fa-user-circle" title="Profile"></i>
+        <i class="fas fa-sign-out-alt" title="Logout" onclick="logoutUser()" style="cursor:pointer;"></i>
+      </div>
+    </div>
+
+    <main>
+      <div class="glass-card">
+        <h2>Blacklist Management</h2>
+
+        <div class="switch-bar">
+          <div>
+            <button class="btn" id="dlBlacklistBtn" onclick="switchTable('dl')">Blacklisted DL</button>
+            <button class="btn" id="rcBlacklistBtn" onclick="switchTable('rc')">Blacklisted RC</button>
+          </div>
+          <div class="form-inline">
+            <select id="type">
+              <option value="dl">DL</option>
+              <option value="rc">RC</option>
+            </select>
+            <input type="text" id="entryNumber" placeholder="Enter DL/RC Number" />
+            <button class="btn" onclick="addBlacklistEntry()">Add to Blacklist</button>
+          </div>
+        </div>
+
+        <table id="blacklistTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Number</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="pagination-controls">
+            <button id="prevPageBtn" onclick="prevPage()" disabled>Previous</button>
+            <span id="pageInfo">Page 1 of 1</span>
+            <button id="nextPageBtn" onclick="nextPage()" disabled>Next</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let currentView = 'dl';
+    let currentPage = 1;
+    const itemsPerPage = 50;
+    let totalPages = 1;
+
+    // Global logout function (consistent across pages)
+    window.logoutUser = function () {
+      const userId = localStorage.getItem("userId");
+      if (userId) {
+        fetch(`http://localhost:3000/api/logout/${userId}`, {
+          method: "POST"
+        })
+          .then(res => res.json())
+          .then(data => {
+            alert(data.message || "✅ Logged out");
+            localStorage.clear();
+            window.location.href = "index.html";
+          })
+          .catch(err => {
+            console.error("Logout error:", err);
+            alert("Logout failed");
+          });
+      } else {
+        localStorage.clear();
+        window.location.href = "index.html";
+      }
+    };
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("collapsed");
+      document.getElementById("mainContainer").classList.toggle("collapsed");
+    }
+
+    async function fetchBlacklist(view, page = 1) {
+      currentPage = page;
+      try {
+        const res = await fetch(`http://localhost:3000/api/blacklist/${view}?page=${currentPage}&limit=${itemsPerPage}`);
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const { data, total, pages } = await res.json();
+
+        totalPages = pages;
+
+        const tbody = document.querySelector("#blacklistTable tbody");
+        tbody.innerHTML = "";
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#6c757d;">No blacklisted ${view.toUpperCase()} entries found.</td></tr>`;
+        } else {
+            data.forEach(item => {
+                const row = document.createElement("tr");
+                const statusText = item.Verification || item.verification || 'N/A';
+                const statusClass = statusText.toLowerCase().includes('blacklisted') ? 'status-blacklisted' : 'status-valid';
+
+                row.innerHTML = `
+                    <td>${item._id}</td>
+                    <td>${view === 'dl' ? item.dl_number : item.regn_number}</td>
+                    <td class="${statusClass}">${statusText.toUpperCase()}</td>
+                    <td><button class="btn" onclick="makeValid('${item._id}', '${view}')">Mark as Valid</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        updatePaginationControls();
+      } catch (err) {
+        console.error("Failed to fetch blacklist:", err);
+        const tbody = document.querySelector("#blacklistTable tbody");
+        tbody.innerHTML = `<tr><td colspan="4" style="color:red; text-align:center;">Error loading blacklist. Please check server.</td></tr>`;
+      }
+    }
+
+    function switchTable(view) {
+      document.getElementById('dlBlacklistBtn').classList.remove('active-btn');
+      document.getElementById('rcBlacklistBtn').classList.remove('active-btn');
+      document.getElementById(`${view}BlacklistBtn`).classList.add('active-btn');
+
+      currentPage = 1;
+      currentView = view;
+      fetchBlacklist(view, currentPage);
+    }
+
+    async function makeValid(id, view) {
+      if (!confirm(`Are you sure you want to mark this ${view.toUpperCase()} as VALID?`)) return;
+      try {
+        const res = await fetch(`http://localhost:3000/api/blacklist/${view}/${id}`, {
+          method: 'PUT'
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert(result.message || "Status updated!");
+            fetchBlacklist(currentView, currentPage);
+        } else {
+            alert(result.message || "Failed to update status.");
+        }
+      } catch (err) {
+        console.error("Failed to update status", err);
+        alert("Failed to update status.");
+      }
+    }
+
+    async function addBlacklistEntry() {
+      const type = document.getElementById("type").value;
+      const number = document.getElementById("entryNumber").value.trim();
+      if (!number) {
+          alert("Please enter a valid DL or RC number.");
+          return;
+      }
+      try {
+        const res = await fetch(`http://localhost:3000/api/blacklist`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, number })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            alert(result.message || "Entry added to Blacklist!");
+            document.getElementById("entryNumber").value = "";
+            switchTable(currentView);
+        } else {
+            alert(result.message || "Failed to add entry to Blacklist.");
+        }
+      } catch (err) {
+        console.error("Failed to add entry", err);
+        alert("Failed to add entry to Blacklist.");
+      }
+    }
+
+    // Pagination functions
+    function updatePaginationControls() {
+        document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById('prevPageBtn').disabled = currentPage === 1;
+        document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+    }
+
+    function nextPage() {
+        if (currentPage < totalPages) {
+            fetchBlacklist(currentView, currentPage + 1);
+        }
+    }
+
+    function prevPage() {
+        if (currentPage > 1) {
+            fetchBlacklist(currentView, currentPage - 1);
+        }
+    }
+
+    // Initial setup on page load
+    document.addEventListener("DOMContentLoaded", () => {
+      const role = localStorage.getItem("userRole");
+      if (role !== "superadmin") {
+        alert("Access denied: Only superadmin can access this page.");
+        window.location.href = "scan.html";
+        return;
+      } else {
+        // Show/hide sidebar links based on role
+        document.getElementById("userManagementLink").style.display = "flex";
+        document.getElementById("vehicleLogsLink").style.display = "flex";
+        document.getElementById("alertLogsLink").style.display = "flex";
+
+        // Set initial active state for blacklist buttons and load data
+        document.getElementById('dlBlacklistBtn').classList.add('active-btn');
+        fetchBlacklist('dl');
+
+        // Set active sidebar item based on current page path
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.sidebar li a').forEach(link => {
+          if (link.getAttribute('href') && currentPath.toLowerCase().includes(link.getAttribute('href').toLowerCase())) {
+            link.closest('li').classList.add('active');
+          } else {
+            link.closest('li').classList.remove('active');
+          }
+        });
+        const blacklistLi = document.getElementById('blacklistManagementLink');
+        if (blacklistLi && currentPath.toLowerCase().includes('blacklist-management.html')) {
+          blacklistLi.classList.add('active');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
