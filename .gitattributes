@@ -1,5 +1,0 @@
-app/model/* filter=lfs diff=lfs merge=lfs -text
-app/embeddings/*.npy filter=lfs diff=lfs merge=lfs -text
-*.onnx filter=lfs diff=lfs merge=lfs -text
-*.pth filter=lfs diff=lfs merge=lfs -text
-*.index filter=lfs diff=lfs merge=lfs -text
