@@ -1,258 +1,151 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("loginForm");
-  const verifyForm = document.getElementById("verifyForm");
-  const logoutBtn = document.getElementById("logoutBtn");
-
-  const dlResult = document.getElementById("dlResult");
-  const rcResult = document.getElementById("rcResult");
-  const suspiciousDiv = document.getElementById("suspiciousAlert");
-  const dlUsageInfoDiv = document.getElementById("dlUsageInfo");
-
-  // 🌍 Get user location
-  async function getLocation() {
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            coordinates: `${pos.coords.latitude},${pos.coords.longitude}`,
-            toll_gate: "Tollgate-1"
-          });
-        },
-        () => {
-          resolve({
-            coordinates: "unknown",
-            toll_gate: "unknown"
-          });
+    // --- FORM & INPUT ELEMENTS ---
+    const verifyForm = document.getElementById("verifyForm");
+    const dlImageInput = document.getElementById("dlImageFile");
+    const rcImageInput = document.getElementById("rcImageFile");
+    const dlNumberInput = document.getElementById("dlNumber");
+    const rcNumberInput = document.getElementById("rcNumber");
+    
+    // --- UI FEEDBACK ELEMENTS ---
+    const dlSpinner = document.getElementById("dlSpinner");
+    const rcSpinner = document.getElementById("rcSpinner");
+    const dlResultDiv = document.getElementById("dlResult");
+    const rcResultDiv = document.getElementById("rcResult");
+    const driverResultDiv = document.getElementById("driverResult");
+    const suspiciousDiv = document.getElementById("suspiciousAlert");
+    const dlUsageInfoDiv = document.getElementById("dlUsageInfo");
+    
+    // --- OCR PROCESSING ---
+    // This function handles the immediate OCR when a file is selected.
+    async function handleImageUploadForOCR(file, endpoint, numberInput, spinner) {
+        if (!file) return;
+  
+        spinner.style.display = 'block';
+        numberInput.value = 'Extracting...';
+        numberInput.disabled = true;
+  
+        const formData = new FormData();
+        const fieldName = endpoint.includes('/dl') ? 'dlImage' : 'rcImage';
+        formData.append(fieldName, file);
+  
+        try {
+            const res = await fetch(`http://localhost:3000${endpoint}`, {
+                method: 'POST',
+                body: formData,
+            });
+  
+            const data = await res.json();
+  
+            if (res.ok && data.extracted_text) {
+                numberInput.value = data.extracted_text;
+            } else {
+                numberInput.value = '';
+                alert(data.message || 'Could not extract text. Please enter manually.');
+            }
+        } catch (err) {
+            console.error(`Error during OCR processing for ${fieldName}:`, err);
+            numberInput.value = '';
+            alert('An error occurred while communicating with the OCR service.');
+        } finally {
+            spinner.style.display = 'none';
+            numberInput.disabled = false;
         }
-      );
-    });
-  }
-
-  // 🔐 LOGIN
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-
-      try {
-        const res = await fetch("http://localhost:3000/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          alert("✅ Login successful");
-          localStorage.setItem("userId", data.userId);
-          localStorage.setItem("userRole", data.role);
-          localStorage.setItem("userName", data.name);
-          localStorage.setItem("roleLabel", data.roleLabel);
-
-          // Redirect
-          window.location.href = data.role === "superadmin"
-            ? "user-management.html"
-            : "scan.html";
-        } else {
-          alert(data.message || "❌ Login failed");
-        }
-      } catch (err) {
-        console.error("Login error:", err);
-        alert("Something went wrong. Try again.");
-      }
-    });
-
-    const showPassCheckbox = document.getElementById("showPassword");
-    if (showPassCheckbox) {
-      showPassCheckbox.addEventListener("change", () => {
-        const passInput = document.getElementById("password");
-        passInput.type = showPassCheckbox.checked ? "text" : "password";
-      });
     }
-  }
-
-  // 🚪 LOGOUT
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", logoutUser);
-  }
-
-  window.logoutUser = function () {
-    const userId = localStorage.getItem("userId");
-    if (userId) {
-      fetch(`http://localhost:3000/api/logout/${userId}`, {
-        method: "POST"
-      })
-        .then(res => res.json())
-        .then(data => {
-          alert(data.message || "✅ Logged out");
-          localStorage.clear();
-          window.location.href = "index.html";
-        })
-        .catch(err => {
-          console.error("Logout error:", err);
-          alert("Logout failed");
+  
+    // Add event listeners to file inputs to trigger OCR.
+    if (dlImageInput) {
+        dlImageInput.addEventListener('change', () => {
+            handleImageUploadForOCR(dlImageInput.files[0], '/api/ocr/dl', dlNumberInput, dlSpinner);
         });
-    } else {
-      localStorage.clear();
-      window.location.href = "index.html";
     }
-  };
-
-  // ✅ Verification
-  if (verifyForm) {
-    verifyForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const dlImage = document.getElementById("dlImage").files[0];
-      const rcImage = document.getElementById("rcImage").files[0];
-      const dl_number = document.getElementById("dlNumber").value.trim();
-      const rc_number = document.getElementById("rcNumber").value.trim();
-
-      if (!dlImage && !rcImage && !dl_number && !rc_number) {
-        dlResult.innerHTML = `<p style="color:red;">❌ Provide at least one DL/RC input.</p>`;
-        rcResult.innerHTML = "";
-        suspiciousDiv.style.display = "none";
-        dlUsageInfoDiv.style.display = "none";
-        document.getElementById("resultSection").style.display = "flex";
-        return;
-      }
-
-      const loc = await getLocation();
-      const formData = new FormData();
-      if (dlImage) formData.append("dlImage", dlImage);
-      if (rcImage) formData.append("rcImage", rcImage);
-      if (dl_number) formData.append("dl_number", dl_number);
-      if (rc_number) formData.append("rc_number", rc_number);
-      formData.append("location", loc.coordinates);
-      formData.append("tollgate", loc.toll_gate);
-
-      dlResult.innerHTML = "⏳ Verifying...";
-      rcResult.innerHTML = "";
-      suspiciousDiv.style.display = "none";
-      suspiciousDiv.innerHTML = "";
-      dlUsageInfoDiv.style.display = "none";
-      dlUsageInfoDiv.innerHTML = "";
-      document.getElementById("resultSection").style.display = "flex";
-
-      try {
-        const res = await fetch("http://localhost:3000/api/verify", {
-          method: "POST",
-          body: formData
+  
+    if (rcImageInput) {
+        rcImageInput.addEventListener('change', () => {
+            handleImageUploadForOCR(rcImageInput.files[0], '/api/ocr/rc', rcNumberInput, rcSpinner);
         });
-
-        const data = await res.json();
-
-        // DL Results
-        if (data.dlData && data.dlData.status) {
-          const color = data.dlData.status === "blacklisted" ? "red" : "green";
-          dlResult.innerHTML = `
-            <div style="border: 1px solid ${color}; padding: 10px; border-radius: 5px; color: black;">
-              <strong>${data.dlData.licenseNumber || 'N/A'}</strong> -
-              <span style="color: ${color};">${data.dlData.status.toUpperCase()}</span><br><br>
-              <b>Name:</b> ${data.dlData.name || 'N/A'}<br>
-              <b>Validity:</b> ${data.dlData.validity || 'N/A'}<br>
-              <b>Phone:</b> ${data.dlData.phone_number || 'N/A'}
-            </div>
-          `;
-
-          const usageRes = await fetch(`http://localhost:3000/api/dl-usage/${data.dlData.licenseNumber}`);
-          const logs = await usageRes.json();
-
-          if (logs.length > 0) {
-            dlUsageInfoDiv.innerHTML = `
-              <div style="border: 1px solid #ccc; padding: 10px; border-radius: 5px; color: black;">
-                <h4>DL Usage Logs:</h4>
-                <ul>
-                  ${logs.map(log => `<li><b>${log.vehicle_number}</b> at ${new Date(log.timestamp).toLocaleString()}</li>`).join("")}
-                </ul>
-              </div>
-            `;
-            dlUsageInfoDiv.style.display = "block";
-          }
-        } else {
-          dlResult.innerHTML = `<p style="color:red;">❌ No DL data found.</p>`;
+    }
+  
+    // --- FINAL VERIFICATION ---
+    // This handles the final form submission with user-corrected data.
+    if (verifyForm) {
+        verifyForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+  
+            // Clear previous results
+            dlResultDiv.style.display = 'none';
+            rcResultDiv.style.display = 'none';
+            driverResultDiv.style.display = 'none';
+            suspiciousDiv.style.display = 'none';
+            dlUsageInfoDiv.style.display = 'none';
+  
+            const dlNumber = dlNumberInput.value.trim();
+            const rcNumber = rcNumberInput.value.trim();
+  
+            if (!dlNumber && !rcNumber) {
+                alert("Please provide a DL number or a Vehicle number to verify.");
+                return;
+            }
+  
+            const verifyBtn = verifyForm.querySelector('button[type="submit"]');
+            verifyBtn.textContent = 'Verifying...';
+            verifyBtn.disabled = true;
+  
+            try {
+                const res = await fetch("http://localhost:3000/api/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    // Send the final text values, not the images
+                    body: JSON.stringify({
+                        dl_number: dlNumber,
+                        rc_number: rcNumber,
+                        location: 'Toll-Plaza-1', // Example location data
+                        tollgate: 'Gate-A'
+                    }),
+                });
+  
+                const result = await res.json();
+                displayResults(result.dlData, result.rcData, result.suspicious);
+  
+            } catch (err) {
+                console.error("Verification error:", err);
+                alert("An error occurred during verification. Please check the server.");
+            } finally {
+                verifyBtn.textContent = 'Verify Information';
+                verifyBtn.disabled = false;
+                // Clear file inputs for the next scan
+                dlImageInput.value = '';
+                rcImageInput.value = '';
+            }
+        });
+    }
+  
+    // --- DISPLAY RESULTS ---
+    function displayResults(dlData, rcData, suspicious) {
+        if (dlData) {
+            const statusClass = dlData.status ? dlData.status.toLowerCase() : 'unknown';
+            dlResultDiv.innerHTML = `
+                <h3>Driving License Details</h3>
+                <p><strong>Status:</strong> <span class="status-${statusClass}">${dlData.status.replace(/_/g, ' ').toUpperCase()}</span></p>
+                <p><strong>Number:</strong> ${dlData.licenseNumber || 'N/A'}</p>
+                <p><strong>Name:</strong> ${dlData.name || 'N/A'}</p>
+                <p><strong>Validity:</strong> ${dlData.validity || 'N/A'}</p>`;
+            dlResultDiv.style.display = 'block';
         }
 
-        // RC Results
-        if (data.rcData && data.rcData.status) {
-          const color = data.rcData.status === "blacklisted" ? "red" : "green";
-          rcResult.innerHTML = `
-            <div style="border: 1px solid ${color}; padding: 10px; border-radius: 5px; color: black;">
-              <strong>${data.rcData.regn_number || 'N/A'}</strong> -
-              <span style="color: ${color};">${data.rcData.status.toUpperCase()}</span><br><br>
-              <b>Owner:</b> ${data.rcData.owner_name || 'N/A'}<br>
-              <b>Vehicle Class:</b> ${data.rcData.vehicle_class || 'N/A'}<br>
-              <b>Chassis No:</b> ${data.rcData.chassis_number || 'N/A'}<br>
-              <b>Engine No:</b> ${data.rcData.engine_number || 'N/A'}<br>
-              <b>Valid Upto:</b> ${data.rcData.valid_upto || 'N/A'}
-            </div>
-          `;
-        } else {
-          rcResult.innerHTML = `<p style="color:red;">❌ No RC data found.</p>`;
+        if (rcData) {
+            const statusClass = rcData.status ? rcData.status.toLowerCase() : 'unknown';
+            rcResultDiv.innerHTML = `
+                <h3>Vehicle RC Details</h3>
+                <p><strong>Status:</strong> <span class="status-${statusClass}">${rcData.status.replace(/_/g, ' ').toUpperCase()}</span></p>
+                <p><strong>Number:</strong> ${rcData.regn_number || 'N/A'}</p>
+                <p><strong>Owner:</strong> ${rcData.owner_name || 'N/A'}</p>`;
+            rcResultDiv.style.display = 'block';
         }
 
-        // Suspicious alert
-        if (data.suspicious || data.dlData?.status === "blacklisted" || data.rcData?.status === "blacklisted") {
-          const reasons = [];
-          if (data.dlData?.status === "blacklisted") reasons.push("DL is blacklisted");
-          if (data.rcData?.status === "blacklisted") reasons.push("RC is blacklisted");
-          if (data.suspicious) reasons.push("DL used with 3+ vehicles in last 2 days");
-
-          suspiciousDiv.innerHTML = `
-            <div style="border: 2px solid red; padding: 12px; margin-top: 15px; border-radius: 6px; color: red; background: #ffe6e6;">
-              <h4>⚠️ Suspicious Activity Detected</h4>
-              <ul>${reasons.map(r => `<li>${r}</li>`).join("")}</ul>
-            </div>
-          `;
-          suspiciousDiv.style.display = "block";
-          suspiciousDiv.scrollIntoView({ behavior: "smooth" });
+        if (suspicious) {
+            suspiciousDiv.textContent = '⚠️ Alert: Suspicious activity has been detected with this DL.';
+            suspiciousDiv.style.display = 'block';
         }
-
-      } catch (err) {
-        console.error("Verification error:", err);
-        dlResult.innerHTML = `<p style="color:red;">❌ Verification failed. Check console.</p>`;
-      }
-    });
-  }
-
-  // 🔎 DL input blur = fetch DL logs
-  const dlNumberInput = document.getElementById("dlNumber");
-  if (dlNumberInput) {
-    dlNumberInput.addEventListener("blur", async () => {
-      const dl_number = dlNumberInput.value.trim();
-      if (!dl_number) return;
-
-      try {
-        const res = await fetch(`http://localhost:3000/api/dl-usage/${dl_number}`);
-        const logs = await res.json();
-
-        if (logs.length > 0) {
-          dlUsageInfoDiv.innerHTML = `
-            <div style="border: 1px solid #ccc; padding: 10px; border-radius: 5px; color: black;">
-              <h4>DL Usage Logs:</h4>
-              <ul>
-                ${logs.map(log => `<li><b>${log.vehicle_number}</b> at ${new Date(log.timestamp).toLocaleString()}</li>`).join("")}
-              </ul>
-            </div>
-          `;
-          dlUsageInfoDiv.style.display = "block";
-        } else {
-          dlUsageInfoDiv.innerHTML = ''; // Clear if no logs
-          dlUsageInfoDiv.style.display = 'none'; // Hide if no logs
-        }
-      } catch (err) {
-        console.error("Usage fetch error:", err);
-        dlUsageInfoDiv.innerHTML = `<p style="color:red;">❌ Error fetching DL usage logs.</p>`;
-        dlUsageInfoDiv.style.display = 'block';
-      }
-    });
-  }
-
-  // Sidebar toggle
-  window.toggleSidebar = function () {
-    document.getElementById("sidebar").classList.toggle("collapsed");
-    document.getElementById("mainContainer").classList.toggle("collapsed");
-  };
+    }
 });
+
