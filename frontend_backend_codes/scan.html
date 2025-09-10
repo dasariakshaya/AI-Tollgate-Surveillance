@@ -82,45 +82,14 @@
       z-index: 10;
       box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
+    .header-left { display: flex; align-items: center; gap: 16px; }
     .logo { height: 60px; }
-
-    .header-text h3 {
-      font-size: 14px;
-      color: #555;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-      font-weight: 500;
-    }
-
-    .header-text h1 {
-      font-size: 18px;
-      color: #1a237e;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .header-right {
-      display: flex;
-      gap: 20px;
-      align-items: center;
-    }
-    .header-right i,
-    .toggle-btn {
-      font-size: 20px;
-      color: #1a237e;
-      cursor: pointer;
-      transition: color 0.3s ease;
-    }
+    .header-text h3 { font-size: 14px; color: #555; margin-bottom: 2px; text-transform: uppercase; font-weight: 500; }
+    .header-text h1 { font-size: 18px; color: #1a237e; font-weight: 700; text-transform: uppercase; }
+    .header-right { display: flex; gap: 20px; align-items: center; }
+    .header-right i, .toggle-btn { font-size: 20px; color: #1a237e; cursor: pointer; transition: color 0.3s ease; }
     .toggle-btn { margin-right: 16px; }
-    .header-right i:hover,
-    .toggle-btn:hover { color: #0f1651; }
+    .header-right i:hover, .toggle-btn:hover { color: #0f1651; }
 
     /* Main Content Area */
     main {
@@ -142,137 +111,120 @@
       color: #1a1a1a;
       width: 100%;
       max-width: 1200px;
-      overflow-x: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
     }
-
-    .glass-card h2 {
-      text-align: center;
-      color: #1a237e;
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 25px;
-      width: 100%;
-    }
+    .glass-card h2 { text-align: center; color: #1a237e; font-size: 24px; font-weight: 700; margin-bottom: 25px; width: 100%; }
 
     /* Buttons */
     .btn {
       background-color: #1a237e;
       color: white;
-      padding: 10px 14px;
-      font-size: 14px;
+      padding: 12px 20px;
+      font-size: 16px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       transition: background-color 0.3s ease;
-      flex-shrink: 0;
+      width: 100%;
+      margin-top: 10px;
     }
     .btn:hover { background-color: #0f1651; }
 
     /* Form Elements */
-    input[type="file"],
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    select {
-      padding: 10px 15px;
+    input[type="text"] {
+      padding: 12px 15px;
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 15px;
+      width: 100%;
       transition: all 0.3s ease;
     }
-    input:focus, select:focus {
+    input:focus {
       outline: none;
       border-color: #1a237e;
       box-shadow: 0 0 5px rgba(26, 35, 126, 0.2);
     }
 
-    /* Specific styles for scan.html */
-    .verification-container {
-      display: flex;
-      padding: 40px 30px;
-      gap: 30px;
-      flex-direction: row;
-      width: 100%;
+    /* --- MODIFIED & ADDED --- Specific styles for scan.html */
+    .verification-container { display: flex; gap: 40px; width: 100%; }
+    .form-column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .result-column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .form-group { display: flex; flex-direction: column; gap: 10px; }
+    .form-group label { font-weight: 600; color: #333; }
+    
+    .input-with-spinner { display: flex; align-items: center; gap: 15px; }
+    .input-with-spinner input[type="file"] { flex-grow: 1; }
+
+    .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border-left-color: #1a237e;
+        animation: spin 1s ease infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 
-    .verification-tabs {
-      flex: 2;
-      min-width: 300px;
+    .result-box { background: #e9eef5; border-left: 5px solid #1a237e; padding: 20px; border-radius: 8px; color: #1a1a1e; }
+    
+    .summary-result-box {
+        background: #f0f4f9;
+        border-left: 5px solid #1a237e;
+        padding: 20px;
+        border-radius: 8px;
+        color: #1a1a1e;
+        font-size: 16px;
+        line-height: 1.6;
     }
-    .result-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      min-width: 250px;
+    .summary-result-box.alert-box {
+        border-left-color: #b71c1c; 
+        background-color: #fbe9e7; 
+        color: #b71c1c;
     }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 24px;
+    .summary-result-box h3 {
+        color: #1a237e;
+        margin-bottom: 15px;
+        font-size: 20px;
     }
-
-    .result-box {
-      background: #f0f4f9;
-      border: 1px solid #ccc;
-      padding: 20px;
-      border-radius: 12px;
-      color: #1a237e;
-      font-weight: 500;
+    .summary-result-box.alert-box h3, .summary-result-box.alert-box h4 {
+        color: #b71c1c;
     }
-
-    .alert-box {
-      border: 1px solid red;
-      background-color: #fbe9e7;
-      color: #b71c1c;
-      padding: 16px;
-      border-radius: 6px;
+    .summary-line {
+        margin-bottom: 10px;
     }
-
-    .alert-box ul {
-      list-style: none;
-      padding-left: 0;
-      margin-top: 10px;
+    .summary-line strong {
+        display: inline-block;
+        width: 240px; /* Aligns the colons */
     }
-
-    #dlUsageInfo {
-        margin-top: 20px;
-        display: none;
+    .summary-line .crime {
+        display: block;
+        margin-left: 245px; /* Aligns under status */
+        color: #c0392b;
+        font-weight: bold;
     }
-
+    
+    /* --- Status Colors for Summary --- */
+    .status-verified, .status-valid, .status-clear { color: #27ae60; font-weight: bold; }
+    .status-blacklisted, .status-alert { color: #c0392b; font-weight: bold; }
+    .status-not_found { color: #f39c12; font-weight: bold; }
+    .status-no_face_detected { color: #7f8c8d; }
+    .status-unknown, .status-error { color: #d35400; }
+    
     /* Responsive */
+    @media (max-width: 900px) {
+        .verification-container { flex-direction: column; }
+    }
     @media (max-width: 768px) {
-      .sidebar { width: 60px; padding-top: 15px; }
-      .sidebar ul { padding-top: 20px;}
-      .sidebar li { flex-direction: column; text-align: center; gap: 5px; padding: 10px 5px;}
-      .sidebar li span { display: none; }
-      .sidebar i { margin-right: 0; }
-
+      .sidebar { width: 60px; }
       .main-container { margin-left: 60px; width: calc(100% - 60px); }
       .header { padding: 10px 15px; }
-      .header-left .logo { height: 40px; }
       .header-text h3, .header-text h1 { display: none; }
-      .toggle-btn { margin-right: 5px; }
-
       main { padding: 15px; }
-      .glass-card { padding: 20px; border-radius: 10px; min-width: unset; width: 95%; }
-      .glass-card h2 { font-size: 20px; margin-bottom: 15px; }
-
-      .verification-container {
-        flex-direction: column;
-        gap: 20px;
-        padding: 15px;
-        align-items: center;
-      }
-      .verification-tabs, .result-section {
-        width: 100%;
-        max-width: 400px;
-      }
+      .glass-card { padding: 20px; }
+      .summary-line strong { width: auto; } /* Adjust for mobile */
+      .summary-line .crime { margin-left: 10px; }
     }
   </style>
 </head>
@@ -290,76 +242,88 @@
 
   <div class="main-container" id="mainContainer">
     <div class="header">
-      <div class="header-left">
-        <span class="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></span>
-        <img src="indian-emblem.png" alt="Government Emblem" class="logo" />
-        <div class="header-text">
-          <h3>Government of India</h3>
-          <h1>Ministry of Road Transport & Highways</h1>
+        <div class="header-left">
+            <span class="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></span>
+            <img src="indian-emblem.png" alt="Government Emblem" class="logo" />
+            <div class="header-text">
+                <h3>Government of India</h3>
+                <h1>Ministry of Road Transport & Highways</h1>
+            </div>
         </div>
-      </div>
-      <div class="header-right">
-        <i class="fas fa-cog" title="Settings"></i>
-        <i class="fas fa-user-circle" title="Profile"></i>
-        <i class="fas fa-sign-out-alt" title="Logout" onclick="logoutUser()" style="cursor:pointer;"></i>
-      </div>
+        <div class="header-right">
+            <i class="fas fa-cog" title="Settings"></i>
+            <i class="fas fa-user-circle" title="Profile"></i>
+            <i class="fas fa-sign-out-alt" title="Logout" onclick="logoutUser()" style="cursor:pointer;"></i>
+        </div>
     </div>
 
-    <main class="verification-container">
-      <div class="verification-tabs">
-        <div class="glass-card">
-          <h2>Driving License, RC & Driver Image Verification</h2>
+    <main>
+      <div class="glass-card">
+        <h2>Driving License and Vehicle Registration Certificate Verification Portal</h2>
+        <form id="verifyForm">
+            <div class="verification-container">
+                <!-- FORM COLUMN -->
+                <div class="form-column">
+                    <!-- DL SECTION -->
+                    <div class="form-group">
+                        <label for="dlImageFile"><i class="fas fa-id-card"></i> Upload Driving License</label>
+                        <div class="input-with-spinner">
+                            <input type="file" id="dlImageFile" name="dlImage" accept="image/*"/>
+                            <div class="spinner" id="dlSpinner" style="display: none;"></div>
+                        </div>
+                        <label for="dlNumber">Driving License Number</label>
+                        <input type="text" id="dlNumber" name="dl_number" placeholder="Select image or enter manually" />
+                    </div>
 
-          <form id="verifyForm">
-            <div class="form-group">
-              <label for="dlImage">Upload Driving License Image</label>
-              <input type="file" name="dlImage" accept="image/*" id="dlImage" />
-              <label for="dlNumber">Enter Driving License Number</label>
-              <input type="text" id="dlNumber" placeholder="e.g., MH12AB1234" />
+                    <!-- RC SECTION -->
+                    <div class="form-group">
+                        <label for="rcImageFile"><i class="fas fa-car"></i> Upload Vehicle Registration Number (Number Plate Number)</label>
+                        <div class="input-with-spinner">
+                            <input type="file" id="rcImageFile" name="rcImage" accept="image/*"/>
+                            <div class="spinner" id="rcSpinner" style="display: none;"></div>
+                        </div>
+                        <label for="rcNumber">Vehicle Number</label>
+                        <input type="text" id="rcNumber" name="rc_number" placeholder="Select image or enter manually" />
+                    </div>
+
+                    <!-- DRIVER IMAGE SECTION -->
+                     <div class="form-group">
+                         <label for="driverImage"><i class="fas fa-camera"></i> Upload Driver Image</label>
+                         <input type="file" name="driverImage" accept="image/*" id="driverImage" />
+                     </div>
+
+                    <button type="submit" class="btn">Verify Information</button>
+                </div>
+
+                <!-- RESULTS COLUMN -->
+                <div class="result-column" id="resultSection">
+                    <!-- RE-ADDED DETAILED RESULT BOXES -->
+                    <div id="dlResult" class="result-box" style="display: none;"></div>
+                    <div id="rcResult" class="result-box" style="display: none;"></div>
+                    <div id="driverResult" class="result-box" style="display: none;"></div>
+                    <!-- SUMMARY BOX -->
+                    <div id="summaryResult" class="summary-result-box" style="display: none;"></div>
+                    <!-- HIDDEN: This div is no longer used, logic is merged into summaryResult -->
+                    <div id="suspiciousAlert" style="display: none;"></div>
+                </div>
             </div>
-
-            <div class="form-group">
-              <label for="rcImage">Upload Vehicle Registration Certificate Image</label>
-              <input type="file" name="rcImage" accept="image/*" id="rcImage" />
-              <label for="rcNumber">Enter Vehicle Registration Number</label>
-              <input type="text" id="rcNumber" placeholder="e.g., TS09FK1234" />
-            </div>
-
-            <!-- 🔹 New Driver Image Upload Block -->
-            <div class="form-group">
-              <label for="driverImage">Upload Driver Image</label>
-              <input type="file" name="driverImage" accept="image/*" id="driverImage" />
-            </div>
-
-            <button type="submit" class="btn">Scan & Verify All</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="result-section" id="resultSection">
-        <div id="dlResult" class="result-box"></div>
-        <div id="rcResult" class="result-box"></div>
-        <div id="driverResult" class="result-box"></div>
-        <div id="suspiciousAlert" class="alert-box" style="display: none;"></div>
-        <div id="dlUsageInfo" class="result-box" style="display: none;"></div>
+        </form>
       </div>
     </main>
   </div>
 
   <script src="script.js"></script>
   <script>
-    // Global functions
-    window.toggleSidebar = function () {
+    // Global functions for sidebar and logout
+    function toggleSidebar() {
       document.getElementById("sidebar").classList.toggle("collapsed");
       document.getElementById("mainContainer").classList.toggle("collapsed");
     };
 
-    window.logoutUser = function () {
+    function logoutUser() {
       const userId = localStorage.getItem("userId");
       if (userId) {
-        fetch(`http://localhost:3000/api/logout/${userId}`, {
-          method: "POST"
-        })
+        fetch(`http://localhost:3000/api/logout/${userId}`, { method: "POST" })
           .then(res => res.json())
           .then(data => {
             alert(data.message || "✅ Logged out");
@@ -376,24 +340,9 @@
       }
     };
 
+    // Role-based UI setup
     document.addEventListener("DOMContentLoaded", () => {
       const role = localStorage.getItem("userRole");
-
-      // Highlight active menu
-      const currentPath = window.location.pathname;
-      document.querySelectorAll('.sidebar li a').forEach(link => {
-        if (link.getAttribute('href') && currentPath.toLowerCase().includes(link.getAttribute('href').toLowerCase())) {
-          link.closest('li').classList.add('active');
-        } else {
-          link.closest('li').classList.remove('active');
-        }
-      });
-      const homeLi = document.querySelector('.sidebar li.active');
-      if (homeLi && !homeLi.querySelector('a') && currentPath.toLowerCase().includes('scan.html')) {
-        homeLi.classList.add('active');
-      }
-
-      // Show/hide sidebar links based on role
       const userManagementLink = document.getElementById("userManagementLink");
       const vehicleLogsLink = document.getElementById("vehicleLogsLink");
       const alertLogsLink = document.getElementById("alertLogsLink");
@@ -403,7 +352,9 @@
       if (vehicleLogsLink) vehicleLogsLink.style.display = (role === "superadmin" || role === "admin" || role === "officer") ? "flex" : "none";
       if (alertLogsLink) alertLogsLink.style.display = (role === "superadmin" || role === "admin") ? "flex" : "none";
       if (blacklistManagementLink) blacklistManagementLink.style.display = (role === "superadmin") ? "flex" : "none";
+
     });
   </script>
 </body>
 </html>
+

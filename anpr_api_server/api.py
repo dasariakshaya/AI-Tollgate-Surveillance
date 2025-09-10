@@ -1,4 +1,3 @@
-# api.py
 import cv2
 import numpy as np
 import onnxruntime
@@ -21,7 +20,48 @@ except Exception as e:
     onnx_session = None
     ocr_reader = None
 
-# --- Copy your perfected regex function here ---
+# --- Image Preprocessing for YOLOv8 ---
+def preprocess_image(image: np.ndarray, input_shape=(640, 640)):
+    """Prepares the image for YOLOv8 object detection."""
+    img_h, img_w, _ = image.shape
+    
+    # Resize image while maintaining aspect ratio
+    scale = min(input_shape[0] / img_h, input_shape[1] / img_w)
+    new_w, new_h = int(img_w * scale), int(img_h * scale)
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+    
+    # Create a new image with padding
+    padded_image = np.full((input_shape[0], input_shape[1], 3), 114, dtype=np.uint8)
+    dw, dh = (input_shape[1] - new_w) // 2, (input_shape[0] - new_h) // 2
+    padded_image[dh:new_h+dh, dw:new_w+dw, :] = resized_image
+    
+    # Normalize and transpose
+    input_tensor = padded_image.astype(np.float32) / 255.0
+    input_tensor = np.transpose(input_tensor, (2, 0, 1)) # HWC to CHW
+    input_tensor = np.expand_dims(input_tensor, axis=0) # Add batch dimension
+    
+    return input_tensor, scale, dw, dh
+
+# --- Post-processing for YOLOv8 Output ---
+def postprocess_output(output, scale, dw, dh, conf_threshold=0.5):
+    """Extracts bounding boxes from YOLOv8 output."""
+    boxes = []
+    output = output[0].T # Transpose to get [num_detections, 5]
+    
+    for row in output:
+        prob = row[4:].max()
+        if prob > conf_threshold:
+            xc, yc, w, h = row[:4]
+            # Un-pad and scale back to original image coordinates
+            x1 = int((xc - dw - w/2) / scale)
+            y1 = int((yc - dh - h/2) / scale)
+            x2 = int((xc - dw + w/2) / scale)
+            y2 = int((yc - dh + h/2) / scale)
+            boxes.append([x1, y1, x2, y2])
+            
+    return boxes
+
+# --- Regex function (unchanged) ---
 def extract_plate_number(ocr_text: str) -> str | None:
     STATE_CODES = {
         "AN", "AP", "AR", "AS", "BR", "CH", "CT", "DN", "DD", "DL", "GA",
@@ -69,14 +109,34 @@ async def recognize_plate(file: UploadFile = File(...)):
 
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    original_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # Note: You will need to add your YOLOv8 preprocessing logic here
-    # This usually involves resizing to 640x640, normalizing, and transposing dimensions.
-    # For now, this example will process the whole image.
-    plate_crop = image 
+    # 1. Preprocess the image for YOLOv8
+    input_tensor, scale, dw, dh = preprocess_image(original_image)
+    
+    # 2. Run detection with the ONNX model
+    input_name = onnx_session.get_inputs()[0].name
+    output_name = onnx_session.get_outputs()[0].name
+    outputs = onnx_session.run([output_name], {input_name: input_tensor})
 
-    # Run OCR and clean the text
+    # 3. Post-process the output to get bounding boxes
+    boxes = postprocess_output(outputs[0], scale, dw, dh)
+
+    if not boxes:
+        return {"plate_number": None, "raw_text": "No license plate detected."}
+
+    # 4. Crop the plate from the *original* image
+    # Assuming the first and most confident detection is the one we want
+    x1, y1, x2, y2 = boxes[0]
+    # Add a small buffer around the crop
+    y1, y2 = max(0, y1 - 5), min(original_image.shape[0], y2 + 5)
+    x1, x2 = max(0, x1 - 5), min(original_image.shape[1], x2 + 5)
+    plate_crop = original_image[y1:y2, x1:x2]
+
+    if plate_crop.size == 0:
+         return {"plate_number": None, "raw_text": "Failed to crop license plate."}
+
+    # 5. Run OCR on the cropped plate and clean the text
     ocr_result = ocr_reader.readtext(plate_crop)
     raw_text = " ".join([res[1] for res in ocr_result])
     plate_number = extract_plate_number(raw_text)
