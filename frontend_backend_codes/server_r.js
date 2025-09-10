@@ -16,14 +16,14 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 // ✅ MONGODB SETUP (ATLAS)
-const mongoUrl = 'mongodb+srv://akshuandyou1826_db_user:vgtlpaizeAJZAXWF@tollgatedb-cluster.jjbai9a.mongodb.net/?retryWrites=true&w=majority&appName=TollgateDB-Cluster';
+const mongoUrl = process.env.MONGODB_URI;
 const client = new MongoClient(mongoUrl);
 let licenseCollection, usersCollection, rcCollection, logsCollection;
 
 // ✅ PYTHON SERVICE URLS
-const PYTHON_DL_SERVICE_URL = 'http://localhost:5001/extract-dl';
-const PYTHON_ANPR_SERVICE_URL = 'http://localhost:8000/recognize_plate/';
-const PYTHON_FACE_SERVICE_URL = 'http://127.0.0.1:5000/verify_driver';
+const PYTHON_DL_SERVICE_URL = process.env.PYTHON_DL_SERVICE_URL;
+const PYTHON_ANPR_SERVICE_URL = process.env.PYTHON_ANPR_SERVICE_URL;
+const PYTHON_FACE_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL;
 
 async function connectDB() {
   try {
