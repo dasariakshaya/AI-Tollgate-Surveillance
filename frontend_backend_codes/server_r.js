@@ -23,7 +23,7 @@ let licenseCollection, usersCollection, rcCollection, logsCollection;
 // ✅ PYTHON SERVICE URLS
 const PYTHON_DL_SERVICE_URL = process.env.PYTHON_DL_SERVICE_URL;
 const PYTHON_ANPR_SERVICE_URL = process.env.PYTHON_ANPR_SERVICE_URL;
-const PYTHON_FACE_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL;
+// const PYTHON_FACE_SERVICE_URL = process.env.PYTHON_FACE_SERVICE_URL;
 
 async function connectDB() {
   try {
