@@ -260,4 +260,3 @@ document.addEventListener("DOMContentLoaded", () => {
         summaryResultDiv.style.display = 'block';
     }
 });
-

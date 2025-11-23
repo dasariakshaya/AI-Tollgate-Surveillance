@@ -7,6 +7,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <style>
+    /* ... [SAME STYLES] ... */
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom right, #f0f4f9, #ffffff); color: #1a1a1a; display: flex; }
     .sidebar { width: 220px; background-color: #1a237e; color: white; height: 100vh; position: fixed; padding-top: 60px; }
     .sidebar ul { list-style: none; padding: 0; }
@@ -64,25 +65,21 @@
     <main>
       <div class="glass-card">
         <h2>System Settings</h2>
-
         <div class="setting-group">
           <h3>Scan Options</h3>
           <label><input type="checkbox" id="autoScanToggle"> Enable Auto Scan on Image Upload</label>
           <label><input type="checkbox" id="useTesseract"> Use Tesseract OCR for DL/RC</label>
         </div>
-
         <div class="setting-group">
           <h3>Security</h3>
           <label><input type="checkbox" id="enableAdminLock"> Enable Admin-Only Access to Logs</label>
           <label><input type="checkbox" id="forceLogout"> Force Logout Inactive Users</label>
         </div>
-
         <div class="setting-group">
           <h3>Alerts & Notifications</h3>
           <label><input type="checkbox" id="suspiciousEmailAlert"> Email alert on suspicious activity</label>
           <label><input type="checkbox" id="dlRcMismatchAlert"> Notify on DL-RC mismatch</label>
         </div>
-
         <button class="btn" onclick="saveSettings()">Save Settings</button>
       </div>
     </main>
@@ -108,7 +105,6 @@
         suspiciousEmailAlert: document.getElementById("suspiciousEmailAlert").checked,
         dlRcMismatchAlert: document.getElementById("dlRcMismatchAlert").checked
       };
-
       localStorage.setItem("systemSettings", JSON.stringify(settings));
       alert("✅ Settings saved successfully!");
     }
