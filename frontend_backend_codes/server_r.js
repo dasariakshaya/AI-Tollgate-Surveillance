@@ -56,7 +56,9 @@ const upload = multer({
 // ====================================================================
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
-const DART_CLIENT_SALT = "Abra_Ca_Dabra!@616D7269736861@#Khulja_Sim_Sim#!@#"; 
+
+// ✅ FIX 2: CORRECTED Mobile App Salt (Matches Flutter Exactly)
+const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; 
 
 // 🛡️ SECURITY: Allowed Email Domains
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
@@ -168,7 +170,10 @@ async function createDefaultAdmin() {
             const defaultPass = "admin123"; 
             const defaultName = "System Admin";
 
+            // 1. Convert to App-style Hash first (Using the CORRECT Salt)
             const appHash = convertToAppHash(defaultPass);
+            
+            // 2. Encrypt for Database
             const finalPassword = await bcrypt.hash(appHash + PASSWORD_PEPPER, 10);
 
             await User.create({
@@ -189,8 +194,6 @@ async function createDefaultAdmin() {
 
 connectDB().then(() => {
     createDefaultAdmin();
-    // Run initial backup on start (optional)
-    // performBackup(); 
 });
 
 // ====================================================================
@@ -297,13 +300,18 @@ app.post('/login', loginLimiter, async (req, res) => {
         const user = await User.findOne({ where: { email } });
         if (!user) return res.status(401).json({ message: "Invalid credentials" });
         
+        // Detect if input is already hashed (App sends 64-char Hex string)
         const isAppHash = /^[a-f0-9]{64}$/i.test(password);
+        
         let passwordToVerify = password;
         if (!isAppHash) {
+            // Web Login (Plain Text) -> Convert to App Hash format
             passwordToVerify = convertToAppHash(password);
         }
 
+        // Now verify against DB (which stores bcrypt of AppHash)
         const isMatch = await bcrypt.compare(passwordToVerify + PASSWORD_PEPPER, user.password);
+        
         if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
         
         // 3. Update User status
@@ -312,6 +320,7 @@ app.post('/login', loginLimiter, async (req, res) => {
             loginTime: new Date() 
         }, { where: { id: user.id } });
 
+        // 4. Issue 1 Hour Token
         const token = jwt.sign(
             { id: user.id, role: user.role }, 
             JWT_SECRET, 
@@ -368,11 +377,9 @@ app.get('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     catch (err) { res.status(500).json({ message: "Fetch failed" }); }
 });
 
-// ✅ FIX: Registration with Domain Check
 app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     const { name, email, password, role } = req.body;
     
-    // 1. Domain Check
     if (!isDomainAllowed(email)) {
         return res.status(400).json({ message: "Email domain not allowed. Use netrasarathi.com, gmail.com, or yahoo.com" });
     }
