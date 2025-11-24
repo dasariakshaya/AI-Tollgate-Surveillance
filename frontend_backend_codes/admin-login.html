@@ -3,12 +3,166 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Login - Calypso</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>System Login - Calypso</title>
+  <style>
+    /* Base Styles */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #f0f4f9, #ffffff);
+      color: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background-color: #ffffff;
+      color: #1a237e;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      border-bottom: 3px solid #1a237e;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo { height: 60px; }
+    
+    .header-text h1 { 
+      font-size: 18px; 
+      margin: 0; 
+      font-weight: 700; 
+      color: #1a237e; 
+      text-transform: uppercase; 
+    }
+    .header-text h3 { 
+      font-size: 14px; 
+      margin: 0; 
+      color: #555; 
+      text-transform: uppercase; 
+      font-weight: 500; 
+    }
+
+    /* Login Container */
+    .login-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 20px;
+      animation: fadeIn 0.8s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-box {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      border: 1px solid #e0e0e0;
+    }
+
+    .login-box h2 {
+      color: #1a237e;
+      margin-bottom: 30px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .input-group { text-align: left; margin-bottom: 20px; }
+    
+    /* FIX: Only apply block display to the main labels, not the checkbox label */
+    .input-group > label { 
+      display: block; 
+      margin-bottom: 8px; 
+      font-weight: 600; 
+      color: #333; 
+      font-size: 14px; 
+    }
+
+    /* FIX: Only apply 100% width to text and password inputs, NOT checkbox */
+    .input-group input:not([type="checkbox"]) {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+    .input-group input:not([type="checkbox"]):focus {
+      outline: none;
+      border-color: #1a237e;
+      box-shadow: 0 0 5px rgba(26, 35, 126, 0.2);
+    }
+
+    /* Checkbox Styles - Perfectly Aligned */
+    .checkbox-group { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      margin-top: 12px; 
+      font-size: 14px; 
+      color: #555;
+      justify-content: flex-start; /* Aligns content to the left */
+    }
+    
+    .checkbox-group input {
+      width: 18px;  /* Fixed width for checkbox */
+      height: 18px; /* Fixed height */
+      margin: 0;
+      cursor: pointer;
+      accent-color: #1a237e; /* Matches theme color */
+    }
+
+    .checkbox-group label {
+      margin-bottom: 0; /* Removes the margin from the general label rule */
+      cursor: pointer;
+      font-weight: normal; /* Not bold like the main labels */
+    }
+    
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: #1a237e;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      margin-top: 10px;
+    }
+    button:hover { background-color: #0f1651; }
+    button:disabled { background-color: #999; cursor: not-allowed; }
+
+    @media (max-width: 768px) {
+      header { padding: 10px 15px; }
+      .logo { height: 40px; }
+      .header-text h3, .header-text h1 { display: none; }
+    }
+  </style>
 </head>
 <body>
 
-  <div class="header">
+  <header>
     <div class="header-left">
       <img src="indian-emblem.png" alt="Parivahan Logo" class="logo" />
       <div class="header-text">
@@ -16,20 +170,22 @@
         <h1>MINISTRY OF ROAD TRANSPORT & HIGHWAYS</h1>
       </div>
     </div>
-  </div>
+  </header>
 
   <div class="login-container">
     <form class="login-box" id="adminLoginForm">
-      <h2>Admin Login</h2>
+      <h2>System Login</h2>
 
       <div class="input-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="Enter email" required />
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="Enter your email" required />
       </div>
 
       <div class="input-group">
         <label for="password">Password</label>
-        <input type="password" id="password" placeholder="Enter password" required />
+        <input type="password" id="password" placeholder="Enter your password" required />
+        
+        <!-- Checkbox Group -->
         <div class="checkbox-group">
           <input type="checkbox" id="showPassword" />
           <label for="showPassword">Show Password</label>
@@ -41,6 +197,10 @@
   </div>
 
   <script>
+    // ⚠️ IMPORTANT: CHANGE THIS URL WHEN DEPLOYING TO RENDER
+    const API_BASE_URL = "http://localhost:3000"; 
+    // Example: const API_BASE_URL = "https://netra-sarathi.onrender.com";
+
     document.getElementById("showPassword").addEventListener("change", function () {
       const pwd = document.getElementById("password");
       pwd.type = this.checked ? "text" : "password";
@@ -48,12 +208,16 @@
 
     document.getElementById("adminLoginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
+      const btn = e.target.querySelector("button");
+      const originalText = btn.textContent;
+      
+      btn.textContent = "Signing In...";
+      btn.disabled = true;
 
       try {
-        const res = await fetch("http://localhost:3000/login", {
+        const res = await fetch(`${API_BASE_URL}/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -61,23 +225,34 @@
 
         const data = await res.json();
 
-        if (res.ok && data.role === 'admin') {
-          // ✅ SECURITY UPDATE: Store JWT Token
-          localStorage.setItem("token", data.token); 
+        if (res.ok && (data.role === 'admin' || data.role === 'superadmin' || data.role === 'officer')) {
           
-          // Store User Details
+          localStorage.clear();
+
+          localStorage.setItem("token", data.token); 
           localStorage.setItem("userRole", data.role);
           localStorage.setItem("userId", data.userId);
-          localStorage.setItem("userName", data.name || "Admin");
+          localStorage.setItem("userName", data.name || "User");
 
-          alert("✅ Login successful!");
-          window.location.href = "scan.html";
+          if(localStorage.getItem("token")) {
+             const roleName = data.role.charAt(0).toUpperCase() + data.role.slice(1);
+             alert(`✅ Login successful! Welcome, ${roleName}.`);
+             window.location.href = "scan.html";
+          } else {
+             alert("❌ Browser Error: Could not save login session. Try disabling Incognito mode.");
+             btn.textContent = originalText;
+             btn.disabled = false;
+          }
         } else {
-          alert("❌ Unauthorized or Invalid Login");
+          alert("❌ Login Failed: " + (data.message || "Unauthorized Access"));
+          btn.textContent = originalText;
+          btn.disabled = false;
         }
       } catch (err) {
         console.error("Login Error:", err);
-        alert("Something went wrong");
+        alert("Server error. Is backend running?");
+        btn.textContent = originalText;
+        btn.disabled = false;
       }
     });
   </script>

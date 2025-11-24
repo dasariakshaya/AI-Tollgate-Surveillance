@@ -41,8 +41,10 @@ app.use(cors({
     }
 }));
 
+// ✅ FIX 1: Support URL Encoded data (Crucial for Mobile Apps)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.text());
+app.use(express.urlencoded({ extended: true })); 
 
 const upload = multer({ 
     dest: 'uploads/',
@@ -50,14 +52,29 @@ const upload = multer({
 });
 
 // ====================================================================
-// 🔐 SECRETS FROM ENV
+// 🔐 SECRETS & CONFIGURATION
 // ====================================================================
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
+const DART_CLIENT_SALT = "Abra_Ca_Dabra!@616D7269736861@#Khulja_Sim_Sim#!@#"; 
 
-// RSA Keys (File system is safe for these on Render)
-const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
-const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
+// 🛡️ SECURITY: Allowed Email Domains
+const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
+
+function isDomainAllowed(email) {
+    const domain = email.split('@')[1];
+    return ALLOWED_DOMAINS.includes(domain);
+}
+
+// 🛡️ CWE: Detect Request Source (App vs Web)
+function getRequestSource(req) {
+    const userAgent = req.headers['user-agent'] || '';
+    // Flutter/Dart usually sends 'Dart/x.x' in User-Agent
+    if (userAgent.includes('Dart') || userAgent.includes('Flutter')) {
+        return 'Mobile App';
+    }
+    return 'Web Portal';
+}
 
 // Rate Limiter
 const loginLimiter = rateLimit({
@@ -66,9 +83,13 @@ const loginLimiter = rateLimit({
     message: "Too many login attempts, please try again later."
 });
 
-// HTTPS Agent for Performance
+// HTTPS Agent
 const httpsAgent = new https.Agent({ keepAlive: true });
 const axiosClient = axios.create({ httpsAgent });
+
+// RSA Keys
+const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
+const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
 
 function generateRSAKeys() {
     if (!fs.existsSync(PRIVATE_KEY_PATH)) {
@@ -85,8 +106,92 @@ function generateRSAKeys() {
 }
 generateRSAKeys();
 
-// ✅ CONNECT TO DATABASE
-connectDB();
+// Helper: Mimic Flutter Hashing
+function convertToAppHash(plainPassword) {
+    return crypto.createHash('sha256').update(plainPassword + DART_CLIENT_SALT).digest('hex');
+}
+
+// ====================================================================
+//  💾 AUTOMATED DAILY BACKUP
+// ====================================================================
+async function performBackup() {
+    console.log("💾 Starting Daily Backup...");
+    try {
+        const backupDir = path.join(__dirname, 'backups');
+        if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupFile = path.join(backupDir, `backup-${timestamp}.json`);
+
+        // Fetch all critical data
+        const [users, logs, blacklistDL, blacklistRC] = await Promise.all([
+            User.findAll(),
+            Log.findAll(),
+            License.findAll({ where: { Verification: 'blacklisted' } }),
+            RC.findAll({ where: { verification: 'blacklisted' } })
+        ]);
+
+        const backupData = {
+            date: new Date(),
+            users,
+            logs,
+            blacklist: { dl: blacklistDL, rc: blacklistRC }
+        };
+
+        fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+        console.log(`✅ Backup successful: ${backupFile}`);
+        
+        // Cleanup old backups (Keep last 7 days)
+        const files = fs.readdirSync(backupDir);
+        if (files.length > 7) {
+            fs.unlinkSync(path.join(backupDir, files[0]));
+        }
+
+    } catch (err) {
+        console.error("❌ Backup Failed:", err);
+    }
+}
+
+// Schedule Backup (Every 24 Hours)
+setInterval(performBackup, 24 * 60 * 60 * 1000);
+
+// ====================================================================
+//  🛡️ SAFETY NET: Create Default Admin
+// ====================================================================
+async function createDefaultAdmin() {
+    try {
+        const count = await User.count();
+        if (count === 0) {
+            console.log("⚠️ No users found! Creating default Super Admin...");
+            
+            const defaultEmail = "admin@netrasarathi.com";
+            const defaultPass = "admin123"; 
+            const defaultName = "System Admin";
+
+            const appHash = convertToAppHash(defaultPass);
+            const finalPassword = await bcrypt.hash(appHash + PASSWORD_PEPPER, 10);
+
+            await User.create({
+                name: defaultName,
+                email: defaultEmail,
+                password: finalPassword,
+                role: 'superadmin'
+            });
+
+            console.log(`✅ Default Admin Created! Login with: ${defaultEmail} / ${defaultPass}`);
+        } else {
+            console.log("✅ Users exist. Database is ready.");
+        }
+    } catch (err) {
+        console.error("❌ Error creating default admin:", err);
+    }
+}
+
+connectDB().then(() => {
+    createDefaultAdmin();
+    // Run initial backup on start (optional)
+    // performBackup(); 
+});
 
 // ====================================================================
 //  WebSocket & Status Logic
@@ -131,7 +236,7 @@ wss.on('connection', (ws) => {
                 ws.userId = data.userId;
                 activeConnections.set(data.userId, ws);
                 cancelDisconnect(ws.userId);
-                User.update({ isActive: true, loginTime: new Date() }, { where: { id: data.userId } }).then(broadcastUpdate);
+                User.update({ isActive: true }, { where: { id: data.userId } }).then(broadcastUpdate);
             }
         } catch (e) {}
     });
@@ -153,7 +258,9 @@ setInterval(() => {
 const verifyToken = (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) return res.status(403).json({ message: "No token provided" });
-    const bearerToken = token.split(' ')[1];
+    
+    const bearerToken = token.startsWith('Bearer ') ? token.split(' ')[1] : token;
+    
     jwt.verify(bearerToken, JWT_SECRET, (err, decoded) => {
         if (err) return res.status(401).json({ message: "Unauthorized" });
         req.user = decoded;
@@ -163,7 +270,7 @@ const verifyToken = (req, res, next) => {
 
 const verifySuperAdmin = (req, res, next) => {
     if (!req.user || req.user.role !== 'superadmin') {
-        return res.status(403).json({ message: "Forbidden" });
+        return res.status(403).json({ message: "Forbidden: Super Admin Access Required" });
     }
     next();
 };
@@ -173,23 +280,61 @@ app.get('/api/auth/public-key', (req, res) => {
     else res.status(500).json({ message: "Keys not ready" });
 });
 
+// ✅ FIX: SECURE LOGIN WITH DOMAIN RESTRICTION & SOURCE TRACKING
 app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
+    
+    // 1. Domain Check
+    if (!isDomainAllowed(email)) {
+        return res.status(403).json({ message: "Access Denied: Domain not authorized." });
+    }
+
+    // 2. Capture Source
+    const source = getRequestSource(req);
+    console.log(`Login Attempt from: ${source} | User: ${email}`);
+
     try {
         const user = await User.findOne({ where: { email } });
         if (!user) return res.status(401).json({ message: "Invalid credentials" });
-        const isMatch = await bcrypt.compare(password + PASSWORD_PEPPER, user.password);
+        
+        const isAppHash = /^[a-f0-9]{64}$/i.test(password);
+        let passwordToVerify = password;
+        if (!isAppHash) {
+            passwordToVerify = convertToAppHash(password);
+        }
+
+        const isMatch = await bcrypt.compare(passwordToVerify + PASSWORD_PEPPER, user.password);
         if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-        const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
+        
+        // 3. Update User status
+        await User.update({ 
+            isActive: true, 
+            loginTime: new Date() 
+        }, { where: { id: user.id } });
+
+        const token = jwt.sign(
+            { id: user.id, role: user.role }, 
+            JWT_SECRET, 
+            { expiresIn: '1h' }
+        );
+
         res.json({ message: "Login successful", token, userId: user.id, role: user.role, name: user.name });
-    } catch (err) { res.status(500).json({ message: "Server error" }); }
+    } catch (err) { 
+        console.error(err);
+        res.status(500).json({ message: "Server error" }); 
+    }
 });
 
 app.post('/api/logout/:userId', async (req, res) => {
     const { userId } = req.params;
     try {
         if (disconnectTimers.has(userId)) { clearTimeout(disconnectTimers.get(userId)); disconnectTimers.delete(userId); }
-        await User.update({ isActive: false, logoutTime: new Date() }, { where: { id: userId } });
+        
+        await User.update({ 
+            isActive: false, 
+            logoutTime: new Date() 
+        }, { where: { id: userId } });
+
         if (activeConnections.has(userId)) { activeConnections.get(userId).terminate(); activeConnections.delete(userId); }
         broadcastUpdate();
         res.json({ message: "Logged out" });
@@ -198,31 +343,68 @@ app.post('/api/logout/:userId', async (req, res) => {
 
 app.post('/api/status/inactive', (req, res) => {
     try {
-        let userId = req.body.userId || JSON.parse(req.body).userId;
+        let bodyData = req.body;
+        if (typeof req.body === 'string') {
+             try { bodyData = JSON.parse(req.body); } catch(e) {}
+        }
+        let userId = bodyData.userId;
         if(userId) scheduleDisconnect(userId);
         res.status(200).send('OK');
     } catch(e) { res.status(200).send('Error'); }
 });
 
 // ====================================================================
-//  USER & DATA ROUTES
+//  USER MANAGEMENT (SECURED)
 // ====================================================================
 
-app.get('/api/users', async (req, res) => {
-    try { const users = await User.findAll({ order: [['id', 'ASC']] }); res.json(users); }
+app.get('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
+    try { 
+        const users = await User.findAll({ 
+            attributes: ['id', 'name', 'email', 'role', 'isActive', 'loginTime'],
+            order: [['id', 'ASC']] 
+        }); 
+        res.json(users); 
+    }
     catch (err) { res.status(500).json({ message: "Fetch failed" }); }
 });
 
+// ✅ FIX: Registration with Domain Check
 app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     const { name, email, password, role } = req.body;
+    
+    // 1. Domain Check
+    if (!isDomainAllowed(email)) {
+        return res.status(400).json({ message: "Email domain not allowed. Use netrasarathi.com, gmail.com, or yahoo.com" });
+    }
+
     try {
         const existing = await User.findOne({ where: { email } });
         if (existing) return res.status(409).json({ message: "Email exists" });
-        const hashedPassword = await bcrypt.hash(password + PASSWORD_PEPPER, 10);
+        
+        const appStyleHash = convertToAppHash(password);
+        const hashedPassword = await bcrypt.hash(appStyleHash + PASSWORD_PEPPER, 10);
+        
         const newUser = await User.create({ name, email, password: hashedPassword, role });
         broadcastUpdate();
         res.status(201).json({ message: "User added", userId: newUser.id });
     } catch (err) { res.status(500).json({ message: "Error adding user" }); }
+});
+
+app.put('/api/users/:userId/role', verifyToken, verifySuperAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const { newRole } = req.body; 
+    try {
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+        if (user.role === 'superadmin' && newRole !== 'superadmin') {
+             const adminCount = await User.count({ where: { role: 'superadmin' } });
+             if (adminCount <= 1) return res.status(403).json({ message: "Cannot remove the last Super Admin" });
+        }
+        user.role = newRole;
+        await user.save();
+        broadcastUpdate();
+        res.json({ message: "User role updated successfully" });
+    } catch (err) { res.status(500).json({ message: "Error updating role" }); }
 });
 
 app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res) => {
@@ -240,7 +422,10 @@ app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res)
     } catch (err) { res.status(500).json({ message: "Error deleting user" }); }
 });
 
-// Bulk Import & Blacklist
+// ====================================================================
+//  BLACKLIST & OCR (SECURED)
+// ====================================================================
+
 app.post('/api/admin/bulk-dl', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: "Upload CSV" });
     const results = [];
@@ -271,7 +456,7 @@ app.post('/api/admin/bulk-rc', verifyToken, verifySuperAdmin, upload.single('fil
     });
 });
 
-app.post('/api/blacklist', async (req, res) => {
+app.post('/api/blacklist', verifyToken, async (req, res) => {
     const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
     const cleaned = number.replace(/\s|-/g, '').toUpperCase();
     try {
@@ -281,23 +466,23 @@ app.post('/api/blacklist', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
-app.get('/api/blacklist/dl', async (req, res) => {
+app.get('/api/blacklist/dl', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
     const where = { Verification: 'blacklisted' }; if (search) where.dl_number = { [Op.iLike]: `%${search}%` };
     const { count, rows } = await License.findAndCountAll({ where, limit, offset });
     res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
 });
 
-app.get('/api/blacklist/rc', async (req, res) => {
+app.get('/api/blacklist/rc', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
     const where = { verification: 'blacklisted' }; if (search) where.regn_number = { [Op.iLike]: `%${search}%` };
     const { count, rows } = await RC.findAndCountAll({ where, limit, offset });
     res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
 });
 
-// ====================================================================
-//  OCR (Uses axiosClient for Keep-Alive)
-// ====================================================================
+app.put('/api/blacklist/:type/:id', verifyToken, verifySuperAdmin, async (req, res) => {
+    res.status(501).json({message: "Not implemented yet"});
+});
 
 app.post('/api/ocr/dl', upload.single('dlImage'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "File required" });
@@ -325,36 +510,13 @@ app.post('/api/ocr/rc', upload.single('rcImage'), async (req, res) => {
     finally { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
 });
 
-// ====================================================================
-//  ⚡ OPTIMIZED VERIFICATION (Parallel Execution)
-// ====================================================================
-
-async function getDLData(raw) {
-    if (!raw) return { status: "no_data_provided" };
-    const dlNum = raw.replace(/\s|-/g, '').toUpperCase();
-    const dl = await License.findOne({ where: { dl_number: dlNum } });
-    if (dl) return { status: dl.Verification, licenseNumber: dl.dl_number, name: dl.name, phone_number: dl.phone_number };
-    return { status: "not_found", licenseNumber: dlNum };
-}
-async function getRCData(raw) {
-    if (!raw) return { status: "no_data_provided" };
-    const rcNum = raw.replace(/\s|-/g, '').toUpperCase();
-    const rc = await RC.findOne({ where: { regn_number: rcNum } });
-    if (rc) return { ...rc.toJSON(), status: rc.verification };
-    return { status: "not_found", regn_number: rcNum };
-}
-async function getFaceDataFromPython(path) {
-    try {
-        const form = new FormData();
-        form.append('file', fs.createReadStream(path)); 
-        const res = await axiosClient.post(process.env.PYTHON_FACE_SERVICE_URL, form, { headers: { ...form.getHeaders() } });
-        return { status: res.data.status || 'UNKNOWN', name: res.data.closest_match || "Unknown", score: res.data.score };
-    } catch (e) { return { status: 'SERVICE_UNAVAILABLE' }; }
-}
-
+// ✅ FIX: VERIFY WITH SOURCE TRACKING LOGGING
 app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { name: 'dlImage', maxCount: 1 }, { name: 'rcImage', maxCount: 1 }]), async (req, res) => {
     const { dl_number, rc_number, location, tollgate } = req.body;
     const driverImage = req.files && req.files['driverImage'] ? req.files['driverImage'][0] : null;
+
+    // Capture Source
+    const source = getRequestSource(req);
 
     try {
         const [dlData, rcData, driverData] = await Promise.all([
@@ -363,7 +525,13 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
             driverImage ? getFaceDataFromPython(driverImage.path) : Promise.resolve(null)
         ]);
 
-        const logEntry = { timestamp: new Date(), scanned_by: 'OCR/Manual', location: location || 'Unknown', tollgate: tollgate || 'Unknown' };
+        const logEntry = { 
+            timestamp: new Date(), 
+            scanned_by: source, // ✅ Log "Mobile App" or "Web Portal"
+            location: location || 'Unknown', 
+            tollgate: tollgate || 'Unknown' 
+        };
+        
         if (dlData) { logEntry.dl_number = dlData.licenseNumber; logEntry.dl_status = dlData.status; }
         if (rcData) { logEntry.vehicle_number = rcData.regn_number; logEntry.rc_status = rcData.status; }
         if (driverData) { logEntry.driver_status = driverData.status; logEntry.driver_name = driverData.name; }
@@ -386,12 +554,8 @@ app.get('/api/logs', async (req, res) => {
     catch (err) { res.status(500).json({ message: "Error fetching logs" }); }
 });
 
-// Warm-Up Function (Prevents Cold Starts)
 function keepAlive() {
     https.get(process.env.APP_URL, (res) => {}).on('error', () => {});
-    [process.env.PYTHON_DL_SERVICE_URL, process.env.PYTHON_ANPR_SERVICE_URL, process.env.PYTHON_FACE_SERVICE_URL].forEach(url => {
-        try { axiosClient.head(url).catch(() => {}); } catch(e) {}
-    });
 }
 setInterval(keepAlive, 5 * 60 * 1000);
 

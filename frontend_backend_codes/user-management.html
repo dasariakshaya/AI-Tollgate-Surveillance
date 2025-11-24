@@ -45,6 +45,8 @@
     .header-with-button { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 20px; gap: 20px; flex-wrap: wrap; width: 100%; }
     .header-with-button h2 { margin-bottom: 0; white-space: nowrap; text-align: left; width: auto; }
     .user-table th, .user-table td { text-align: center; }
+    .role-select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; background: white; cursor: pointer; }
+
     @media (max-width: 768px) {
       .sidebar { width: 60px; }
       .sidebar li span { display: none; }
@@ -115,40 +117,48 @@
   </div>
 
   <script>
+    // ⚠️ IMPORTANT: Change this to your Render URL when deploying!
+    const API_BASE_URL = "http://localhost:3000"; 
+    // Example: const API_BASE_URL = "https://your-app.onrender.com";
+
+    // Helper to get token
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem("token");
+        return { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+        };
+    };
+
     window.toggleSidebar = function () {
       document.getElementById("sidebar").classList.toggle("collapsed");
       document.getElementById("mainContainer").classList.toggle("collapsed");
     };
 
     window.logoutUser = function () {
-      const userId = localStorage.getItem("userId");
-      if (userId) {
-        navigator.sendBeacon(`http://localhost:3000/api/status/inactive`, JSON.stringify({ userId: userId }));
-        fetch(`http://localhost:3000/api/logout/${userId}`, { method: "POST" })
-          .then(res => res.json())
-          .then(data => {
-            alert(data.message || "✅ Logged out");
-            localStorage.clear();
-            window.location.href = "index.html";
-          })
-          .catch(err => {
-            localStorage.clear();
-            window.location.href = "index.html";
-          });
-      } else {
-        localStorage.clear();
-        window.location.href = "index.html";
-      }
+      localStorage.clear();
+      window.location.href = "index.html";
     };
 
     async function fetchUsers() {
       try {
-        const res = await fetch("http://localhost:3000/api/users");
+        const res = await fetch(`${API_BASE_URL}/api/users`, {
+            headers: getAuthHeaders()
+        });
+
+        if (res.status === 401 || res.status === 403) {
+            // Token expired (1 hour limit reached) or unauthorized
+            alert("Session Expired or Unauthorized. Please Login again.");
+            localStorage.clear();
+            window.location.href = 'index.html';
+            return;
+        }
+
         const users = await res.json();
         const tableBody = document.querySelector("#userTable tbody");
         tableBody.innerHTML = "";
         
-        if(users.length === 0) {
+        if(!Array.isArray(users) || users.length === 0) {
            tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No users found.</td></tr>`;
            return;
         }
@@ -158,35 +168,81 @@
           const userId = user.id || user._id || '-';
           const loginTime = user.loginTime ? new Date(user.loginTime).toLocaleString() : '-';
           const logoutTime = user.logoutTime ? new Date(user.logoutTime).toLocaleString() : '-';
+          const isSelf = (userId == localStorage.getItem("userId"));
+
+          // Dropdown for Role Change
+          const roleSelect = `
+            <select class="role-select" onchange="changeUserRole('${userId}', this.value)" ${isSelf ? 'disabled' : ''}>
+                <option value="officer" ${user.role === 'officer' ? 'selected' : ''}>Officer</option>
+                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                <option value="superadmin" ${user.role === 'superadmin' ? 'selected' : ''}>Super Admin</option>
+            </select>
+          `;
           
           row.innerHTML = `
             <td>${userId}</td>
             <td>${user.name || '-'}</td>
             <td>${user.email || '-'}</td>
-            <td>${user.role || '-'}</td>
+            <td>${roleSelect}</td>
             <td>${loginTime}</td>
             <td>${logoutTime}</td>
             <td><span class="${user.isActive ? 'status-active' : 'status-inactive'}">
               ${user.isActive ? 'Active' : 'Inactive'}
             </span></td>
             <td>
-              <button onclick="deleteUser('${userId}')" style="color:red; border:none; background:none; cursor:pointer;">Delete</button>
+              <button onclick="deleteUser('${userId}')" style="color:red; border:none; background:none; cursor:pointer;" ${isSelf ? 'disabled' : ''}>
+                <i class="fas fa-trash"></i> Delete
+              </button>
             </td>`;
           tableBody.appendChild(row);
         });
       } catch (err) {
+        console.error("Fetch Error:", err);
         const tableBody = document.querySelector("#userTable tbody");
-        tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Error loading users.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center;">Error loading users. Is Server running?</td></tr>`;
       }
+    }
+
+    async function changeUserRole(userId, newRole) {
+        if(!confirm(`Change role to ${newRole}?`)) {
+            fetchUsers(); // Revert
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
+                method: "PUT",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ newRole })
+            });
+            if(res.ok) {
+                alert("✅ Role Updated");
+                fetchUsers();
+            } else {
+                alert("❌ Update Failed");
+                fetchUsers();
+            }
+        } catch(e) {
+            alert("Connection Error");
+            fetchUsers();
+        }
     }
 
     async function deleteUser(userId) {
       if (!confirm("Are you sure you want to delete this user?")) return;
-      // 🛡️ SECURITY UPDATE: Sending x-user-id
-      await fetch(`http://localhost:3000/api/users/${userId}`, { 
-          method: 'DELETE',
-          headers: { "x-user-id": localStorage.getItem("userId") } 
-      });
+      try {
+          const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { 
+              method: 'DELETE',
+              headers: getAuthHeaders()
+          });
+          if(res.ok) {
+              alert("User Deleted");
+              fetchUsers();
+          } else {
+              alert("Delete Failed");
+          }
+      } catch(e) {
+          alert("Error deleting user");
+      }
     }
 
     async function openAddUserPrompt() {
@@ -194,23 +250,25 @@
       if (!name) return;
       const email = prompt("Enter user's email:");
       if (!email) return;
-      const password = prompt("Enter password for the user:");
+      const password = prompt("Enter password:");
       if (!password) return;
-      const role = prompt("Enter role (e.g. admin, officer, superadmin):", "officer");
+      const role = prompt("Enter role (officer, admin, superadmin):", "officer");
       if (!role) return;
 
       try {
-        // 🛡️ SECURITY UPDATE: Sending x-user-id
-        const res = await fetch("http://localhost:3000/api/users", {
+        const res = await fetch(`${API_BASE_URL}/api/users`, {
           method: "POST",
-          headers: { 
-              "Content-Type": "application/json",
-              "x-user-id": localStorage.getItem("userId") 
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ name, email, password, role })
         });
         const data = await res.json();
-        alert(data.message || "Action completed.");
+        
+        if(res.ok) {
+            alert("✅ User Created Successfully");
+            fetchUsers();
+        } else {
+            alert("❌ Error: " + data.message);
+        }
       } catch (err) {
         alert("Could not add user");
       }
@@ -219,52 +277,55 @@
     document.addEventListener("DOMContentLoaded", () => {
       const role = localStorage.getItem("userRole");
       const userId = localStorage.getItem("userId");
+      const token = localStorage.getItem("token");
 
-      if (!userId) {
+      if (!userId || !token) {
           window.location.href = "index.html";
           return;
       }
 
       if (role !== "superadmin") {
-        alert("Access denied: Only superadmin can access this page.");
+        alert("Access Denied. Super Admin only.");
         window.location.href = "scan.html";
         return;
       }
 
       fetchUsers();
 
+      // ✅ REAL-TIME UPDATES: Connect to WebSocket
       let ws;
       function connectWebSocket() {
-          ws = new WebSocket('ws://localhost:3000');
-          ws.onopen = () => ws.send(JSON.stringify({ type: 'REGISTER', userId: userId }));
-          ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === 'USER_STATUS_CHANGE') fetchUsers();
+          // Auto-detect ws or wss based on API URL
+          const wsUrl = API_BASE_URL.replace("http", "ws"); 
+          ws = new WebSocket(wsUrl);
+          
+          ws.onopen = () => {
+              // Register this admin connection
+              ws.send(JSON.stringify({ type: 'REGISTER', userId: userId }));
           };
-          ws.onclose = () => setTimeout(connectWebSocket, 3000);
+
+          ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                // If ANY user logs in/out, refresh the table automatically
+                if (message.type === 'USER_STATUS_CHANGE') {
+                    console.log("Update received, refreshing table...");
+                    fetchUsers();
+                }
+            } catch(e) {}
+          };
+
+          ws.onclose = () => setTimeout(connectWebSocket, 3000); // Reconnect if dropped
       }
       connectWebSocket();
 
-      window.addEventListener("beforeunload", () => {
-          const url = "http://localhost:3000/api/status/inactive";
-          const data = JSON.stringify({ userId: userId });
-          navigator.sendBeacon(url, data);
-      });
-
+      // Highlight Active Sidebar Link
       const currentPath = window.location.pathname.split('/').pop();
       document.querySelectorAll('.sidebar li a').forEach(link => {
         const linkPath = link.getAttribute('href');
         if (linkPath === currentPath) link.closest('li').classList.add('active');
         else link.closest('li').classList.remove('active');
       });
-      const userManagementLink = document.getElementById("userManagementLink");
-      const vehicleLogsLink = document.getElementById("vehicleLogsLink");
-      const alertLogsLink = document.getElementById("alertLogsLink");
-      const blacklistManagementLink = document.getElementById("blacklistManagementLink");
-      if (userManagementLink) userManagementLink.style.display = (role === "superadmin") ? "flex" : "none";
-      if (vehicleLogsLink) vehicleLogsLink.style.display = (role === "superadmin" || role === "admin" || role === "officer") ? "flex" : "none";
-      if (alertLogsLink) alertLogsLink.style.display = (role === "superadmin" || role === "admin") ? "flex" : "none";
-      if (blacklistManagementLink) blacklistManagementLink.style.display = (role === "superadmin") ? "flex" : "none";
     });
   </script>
 </body>

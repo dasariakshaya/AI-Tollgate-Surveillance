@@ -9,221 +9,45 @@
   <style>
     /* STYLES */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(to bottom right, #f0f4f9, #ffffff);
-      color: #1a1a1a;
-      display: flex;
-      overflow-x: hidden;
-    }
-    .sidebar {
-      width: 220px;
-      background-color: #1a237e;
-      color: white;
-      height: 100vh;
-      position: fixed;
-      transition: all 0.3s ease;
-      padding-top: 60px;
-      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-      z-index: 20;
-    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(to bottom right, #f0f4f9, #ffffff); color: #1a1a1a; display: flex; overflow-x: hidden; }
+    .sidebar { width: 220px; background-color: #1a237e; color: white; height: 100vh; position: fixed; transition: all 0.3s ease; padding-top: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 20; }
     .sidebar.collapsed { width: 60px; }
     .sidebar ul { list-style: none; padding: 0; }
-    .sidebar li {
-      padding: 15px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-    .sidebar li:hover,
-    .sidebar li.active { background-color: #0f1651; }
-    .sidebar li a {
-      color: inherit;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      height: 100%;
-    }
+    .sidebar li { padding: 15px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.3s; }
+    .sidebar li:hover, .sidebar li.active { background-color: #0f1651; }
+    .sidebar li a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 12px; width: 100%; height: 100%; }
     .sidebar.collapsed li span { display: none; }
     .sidebar i { font-size: 18px; }
-
-    .main-container {
-      margin-left: 220px;
-      width: calc(100% - 220px);
-      transition: all 0.3s ease;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .collapsed + .main-container {
-      margin-left: 60px;
-      width: calc(100% - 60px);
-    }
-
-    .header {
-      background-color: #ffffff;
-      padding: 16px 32px;
-      border-bottom: 3px solid #1a237e;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
+    .main-container { margin-left: 220px; width: calc(100% - 220px); transition: all 0.3s ease; display: flex; flex-direction: column; min-height: 100vh; }
+    .collapsed + .main-container { margin-left: 60px; width: calc(100% - 60px); }
+    .header { background-color: #ffffff; padding: 16px 32px; border-bottom: 3px solid #1a237e; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     .header-left { display: flex; align-items: center; gap: 16px; }
     .logo { height: 60px; }
-    .header-text h3 {
-      font-size: 14px;
-      color: #555;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-      font-weight: 500;
-    }
-    .header-text h1 {
-      font-size: 18px;
-      color: #1a237e;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
+    .header-text h3 { font-size: 14px; color: #555; margin-bottom: 2px; text-transform: uppercase; font-weight: 500; }
+    .header-text h1 { font-size: 18px; color: #1a237e; font-weight: 700; text-transform: uppercase; }
     .header-right { display: flex; gap: 20px; align-items: center; }
-    .header-right i,
-    .toggle-btn {
-      font-size: 20px;
-      color: #1a237e;
-      cursor: pointer;
-      transition: color 0.3s ease;
-    }
+    .header-right i, .toggle-btn { font-size: 20px; color: #1a237e; cursor: pointer; transition: color 0.3s ease; }
     .toggle-btn { margin-right: 16px; }
-    .header-right i:hover,
-    .toggle-btn:hover { color: #0f1651; }
-
-    main {
-      padding: 40px 30px;
-      flex-grow: 1;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      overflow-y: auto;
-    }
-    .glass-card {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      padding: 30px 40px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-      color: #1a1a1a;
-      width: 100%;
-      max-width: 1200px;
-    }
-    .glass-card h2 {
-      text-align: center;
-      color: #1a237e;
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 25px;
-    }
-
-    .btn {
-      background-color: #1a237e;
-      color: white;
-      padding: 12px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      width: 100%;
-      margin-top: 10px;
-    }
+    .header-right i:hover, .toggle-btn:hover { color: #0f1651; }
+    main { padding: 40px 30px; flex-grow: 1; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; }
+    .glass-card { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(10px); border-radius: 16px; padding: 30px 40px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); color: #1a1a1a; width: 100%; max-width: 1200px; }
+    .glass-card h2 { text-align: center; color: #1a237e; font-size: 24px; font-weight: 700; margin-bottom: 25px; }
+    .btn { background-color: #1a237e; color: white; padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s ease; width: 100%; margin-top: 10px; }
     .btn:hover { background-color: #0f1651; }
-
-    input[type="text"] {
-      padding: 12px 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 15px;
-      width: 100%;
-      transition: all 0.3s ease;
-    }
-    input:focus {
-      outline: none;
-      border-color: #1a237e;
-      box-shadow: 0 0 5px rgba(26, 35, 126, 0.2);
-    }
-
-    .verification-container {
-      display: flex;
-      gap: 40px;
-      width: 100%;
-    }
-    .form-column {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .result-column {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    input[type="text"] { padding: 12px 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; width: 100%; transition: all 0.3s ease; }
+    input:focus { outline: none; border-color: #1a237e; box-shadow: 0 0 5px rgba(26, 35, 126, 0.2); }
+    .verification-container { display: flex; gap: 40px; width: 100%; }
+    .form-column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .result-column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .form-group { display: flex; flex-direction: column; gap: 10px; }
     .form-group label { font-weight: 600; color: #333; }
-
-    .input-with-spinner {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-    .input-with-spinner input[type="file"] {
-      flex-grow: 1;
-    }
-    .spinner {
-      border: 4px solid rgba(0, 0, 0, 0.1);
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border-left-color: #1a237e;
-      animation: spin 1s ease infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .result-box {
-      background: #e9eef5;
-      border-left: 5px solid #1a237e;
-      padding: 20px;
-      border-radius: 8px;
-      color: #1a1a1e;
-      font-size: 14px;
-    }
-
-    @media (max-width: 900px) {
-      .verification-container { flex-direction: column; }
-    }
-
-    .status-pill {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-left: 8px;
-    }
+    .input-with-spinner { display: flex; align-items: center; gap: 15px; }
+    .input-with-spinner input[type="file"] { flex-grow: 1; }
+    .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 28px; height: 28px; border-radius: 50%; border-left-color: #1a237e; animation: spin 1s ease infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .result-box { background: #e9eef5; border-left: 5px solid #1a237e; padding: 20px; border-radius: 8px; color: #1a1a1e; font-size: 14px; }
+    @media (max-width: 900px) { .verification-container { flex-direction: column; } }
+    .status-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; }
     .status-valid { background: #e0f7e9; color: #1b5e20; }
     .status-blacklisted { background: #ffebee; color: #b71c1c; }
     .status-alert { background: #fff3e0; color: #e65100; }
@@ -306,6 +130,10 @@
   </div>
 
   <script>
+    // ⚠️ IMPORTANT: CHANGE THIS URL TO YOUR RENDER URL WHEN DEPLOYING
+    const API_BASE_URL = "http://localhost:3000"; 
+    // Example: const API_BASE_URL = "https://netra-sarathi.onrender.com";
+
     function toggleSidebar() {
       document.getElementById("sidebar").classList.toggle("collapsed");
       document.getElementById("mainContainer").classList.toggle("collapsed");
@@ -314,14 +142,12 @@
     function logoutUser() {
       const userId = localStorage.getItem("userId");
       if (userId) {
-        navigator.sendBeacon(`http://localhost:3000/api/status/inactive`, JSON.stringify({ userId: userId }));
-        fetch(`http://localhost:3000/api/logout/${userId}`, { method: "POST" })
-          .then(res => res.json())
-          .then(() => {
-            localStorage.clear();
-            window.location.href = "index.html";
-          })
-          .catch(() => {
+        // Use Beacon for reliability
+        navigator.sendBeacon(`${API_BASE_URL}/api/status/inactive`, JSON.stringify({ userId: userId }));
+        
+        // Also call endpoint
+        fetch(`${API_BASE_URL}/api/logout/${userId}`, { method: "POST" })
+          .finally(() => {
             localStorage.clear();
             window.location.href = "index.html";
           });
@@ -353,23 +179,22 @@
 
       let ws;
       function connectWebSocket() {
-        ws = new WebSocket('ws://localhost:3000');
-        ws.onopen = () => {
-          ws.send(JSON.stringify({ type: 'REGISTER', userId: userId }));
-        };
+        const wsUrl = API_BASE_URL.replace("http", "ws");
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'REGISTER', userId: userId }));
         ws.onclose = () => setTimeout(connectWebSocket, 3000);
         ws.onerror = (err) => console.error("WS Error", err);
       }
       connectWebSocket();
 
       window.addEventListener("beforeunload", () => {
-        const url = "http://localhost:3000/api/status/inactive";
+        const url = `${API_BASE_URL}/api/status/inactive`;
         const data = JSON.stringify({ userId: userId });
         navigator.sendBeacon(url, data);
       });
     });
 
-    // DL OCR auto-fill
+    // DL OCR
     document.getElementById("dlImageFile").addEventListener("change", async (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -378,24 +203,13 @@
       const formData = new FormData();
       formData.append("dlImage", file);
       try {
-        const response = await fetch("http://localhost:3000/api/ocr/dl", {
-          method: "POST",
-          body: formData
-        });
+        const response = await fetch(`${API_BASE_URL}/api/ocr/dl`, { method: "POST", body: formData });
         const data = await response.json();
-        if (response.ok) {
-          document.getElementById("dlNumber").value = data.dl_number || "";
-        } else if (data.message !== "DL Service not configured") {
-          alert(data.message || "Failed to extract.");
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        spinner.style.display = "none";
-      }
+        if (response.ok) document.getElementById("dlNumber").value = data.dl_number || "";
+      } catch (error) { console.error(error); } finally { spinner.style.display = "none"; }
     });
 
-    // RC OCR auto-fill
+    // RC OCR
     document.getElementById("rcImageFile").addEventListener("change", async (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -404,147 +218,48 @@
       const formData = new FormData();
       formData.append("rcImage", file);
       try {
-        const response = await fetch("http://localhost:3000/api/ocr/rc", {
-          method: "POST",
-          body: formData
-        });
+        const response = await fetch(`${API_BASE_URL}/api/ocr/rc`, { method: "POST", body: formData });
         const data = await response.json();
-        if (response.ok && data.extracted_text) {
-          document.getElementById("rcNumber").value = data.extracted_text;
-        } else {
-          alert("Failed to extract.");
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        spinner.style.display = "none";
-      }
+        if (response.ok && data.extracted_text) document.getElementById("rcNumber").value = data.extracted_text;
+      } catch (error) { console.error(error); } finally { spinner.style.display = "none"; }
     });
 
-    // ============================
-    //  VERIFY FORM SUBMIT HANDLER
-    // ============================
+    // Verify
     document.getElementById("verifyForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-
-      const dlNumber = document.getElementById("dlNumber").value.trim();
-      const rcNumber = document.getElementById("rcNumber").value.trim();
-
       const formEl = document.getElementById("verifyForm");
       const formData = new FormData(formEl);
-
-      // Add any static fields if needed
-      if (!formData.get("dl_number")) formData.set("dl_number", dlNumber);
-      if (!formData.get("rc_number")) formData.set("rc_number", rcNumber);
-      if (!formData.get("location")) formData.set("location", "Unknown Tollgate");
-      if (!formData.get("tollgate")) formData.set("tollgate", "NH-Example");
-
+      
       const dlResultBox = document.getElementById("dlResult");
       const rcResultBox = document.getElementById("rcResult");
       const driverResultBox = document.getElementById("driverResult");
       const summaryResultBox = document.getElementById("summaryResult");
-
-      dlResultBox.style.display = "none";
-      rcResultBox.style.display = "none";
-      driverResultBox.style.display = "none";
-      summaryResultBox.style.display = "none";
-
-      dlResultBox.innerHTML = "";
-      rcResultBox.innerHTML = "";
-      driverResultBox.innerHTML = "";
-      summaryResultBox.innerHTML = "";
+      [dlResultBox, rcResultBox, driverResultBox, summaryResultBox].forEach(el => {
+          el.style.display = "none"; el.innerHTML = "";
+      });
 
       try {
-        const response = await fetch("http://localhost:3000/api/verify", {
-          method: "POST",
-          body: formData
-        });
-
+        const response = await fetch(`${API_BASE_URL}/api/verify`, { method: "POST", body: formData });
         const data = await response.json();
-        if (!response.ok) {
-          alert(data.message || "Verification failed");
-          return;
-        }
-
+        if (!response.ok) { alert(data.message || "Verification failed"); return; }
         const { dlData, rcData, driverData, suspicious } = data;
 
-        // DL RESULT
         if (dlData) {
-          const statusClass =
-            dlData.status === "valid"
-              ? "status-valid"
-              : dlData.status === "blacklisted"
-              ? "status-blacklisted"
-              : "status-unknown";
-
-          dlResultBox.innerHTML = `
-            <strong>Driving License Verification</strong>
-            <br/>
-            DL Number: <b>${dlData.licenseNumber || "-"}</b>
-            <span class="status-pill ${statusClass}">${(dlData.status || "UNKNOWN").toUpperCase()}</span>
-            <br/>
-            Name: ${dlData.name || "-"}<br/>
-            Phone: ${dlData.phone_number || "-"}
-          `;
+          dlResultBox.innerHTML = `<strong>DL Verification</strong><br/>No: <b>${dlData.licenseNumber||"-"}</b> <span class="status-pill status-${dlData.status}">${(dlData.status||"UNKNOWN").toUpperCase()}</span><br/>Name: ${dlData.name||"-"}`;
           dlResultBox.style.display = "block";
         }
-
-        // RC RESULT
         if (rcData) {
-          const statusClass =
-            rcData.status === "valid"
-              ? "status-valid"
-              : rcData.status === "blacklisted"
-              ? "status-blacklisted"
-              : "status-unknown";
-
-          rcResultBox.innerHTML = `
-            <strong>Vehicle RC Verification</strong>
-            <br/>
-            Vehicle Number: <b>${rcData.regn_number || "-"}</b>
-            <span class="status-pill ${statusClass}">${(rcData.status || "UNKNOWN").toUpperCase()}</span>
-            <br/>
-            Owner Name: ${rcData.owner_name || "-"}<br/>
-            Engine No: ${rcData.engine_number || "-"}<br/>
-            Chassis No: ${rcData.chassis_number || "-"}
-          `;
+          rcResultBox.innerHTML = `<strong>RC Verification</strong><br/>No: <b>${rcData.regn_number||"-"}</b> <span class="status-pill status-${rcData.status}">${(rcData.status||"UNKNOWN").toUpperCase()}</span><br/>Owner: ${rcData.owner_name||"-"}`;
           rcResultBox.style.display = "block";
         }
-
-        // DRIVER / FACE RESULT
         if (driverData) {
-          let statusClass = "status-unknown";
-          if (driverData.status === "ALERT" || driverData.status === "SUSPECT") {
-            statusClass = "status-alert";
-          } else if (driverData.status === "CLEAR" || driverData.status === "SAFE") {
-            statusClass = "status-valid";
-          }
-
-          driverResultBox.innerHTML = `
-            <strong>Driver Face Verification</strong>
-            <br/>
-            Status:
-            <span class="status-pill ${statusClass}">
-              ${(driverData.status || "UNKNOWN").toUpperCase()}
-            </span>
-            <br/>
-            Name: ${driverData.name || "-"}<br/>
-            Score: ${driverData.score != null ? driverData.score.toFixed(3) : "-"}<br/>
-            ${driverData.message ? `<em>${driverData.message}</em>` : ""}
-          `;
+          driverResultBox.innerHTML = `<strong>Driver Verification</strong><br/>Status: <span class="status-pill status-${driverData.status === 'CLEAR' ? 'valid' : 'alert'}">${(driverData.status||"UNKNOWN").toUpperCase()}</span><br/>Name: ${driverData.name||"-"}`;
           driverResultBox.style.display = "block";
         }
-
-        // SUMMARY
-        summaryResultBox.innerHTML = suspicious
-          ? `<strong>System Summary</strong><br/>⚠️ <b>Suspicious activity detected.</b> Please check alert logs.`
-          : `<strong>System Summary</strong><br/>✅ No suspicious patterns detected.`;
+        summaryResultBox.innerHTML = suspicious ? `<strong>Summary</strong><br/>⚠️ Suspicious activity detected.` : `<strong>Summary</strong><br/>✅ No suspicious patterns.`;
         summaryResultBox.style.display = "block";
 
-      } catch (err) {
-        console.error(err);
-        alert("Verification failed due to network/server error.");
-      }
+      } catch (err) { alert("Network Error"); }
     });
   </script>
 </body>
