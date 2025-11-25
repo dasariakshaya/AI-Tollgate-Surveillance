@@ -1,4 +1,4 @@
-require('dotenv').config(); // ✅ Load .env file
+require('dotenv').config(); 
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -27,7 +27,7 @@ app.use(helmet());
 
 // CORS SETUP
 const allowedOrigins = [
-    process.env.APP_URL, // Production URL
+    process.env.APP_URL, 
     'http://127.0.0.1:5500',
     'http://localhost:3000'
 ];
@@ -35,32 +35,31 @@ app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(null, true); // Block unknown origins
+            return callback(null, true); 
         }
         return callback(null, true);
     }
 }));
 
-// ✅ FIX 1: Support URL Encoded data (Crucial for Mobile Apps)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.text());
 app.use(express.urlencoded({ extended: true })); 
 
 const upload = multer({ 
     dest: 'uploads/',
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB Max File Size
+    limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
 // ====================================================================
-// 🔐 SECRETS & CONFIGURATION
+// 🔐 CONFIGURATION
 // ====================================================================
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
+const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; // Fixed Salt
 
-// ✅ FIX 2: CORRECTED Mobile App Salt (Matches Flutter Exactly)
-const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; 
+// 1 HOUR Inactivity Limit (in milliseconds)
+const INACTIVITY_LIMIT = 60 * 60 * 1000; 
 
-// 🛡️ SECURITY: Allowed Email Domains
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
 
 function isDomainAllowed(email) {
@@ -68,24 +67,20 @@ function isDomainAllowed(email) {
     return ALLOWED_DOMAINS.includes(domain);
 }
 
-// 🛡️ CWE: Detect Request Source (App vs Web)
 function getRequestSource(req) {
     const userAgent = req.headers['user-agent'] || '';
-    // Flutter/Dart usually sends 'Dart/x.x' in User-Agent
     if (userAgent.includes('Dart') || userAgent.includes('Flutter')) {
         return 'Mobile App';
     }
     return 'Web Portal';
 }
 
-// Rate Limiter
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
     message: "Too many login attempts, please try again later."
 });
 
-// HTTPS Agent
 const httpsAgent = new https.Agent({ keepAlive: true });
 const axiosClient = axios.create({ httpsAgent });
 
@@ -95,7 +90,6 @@ const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
 
 function generateRSAKeys() {
     if (!fs.existsSync(PRIVATE_KEY_PATH)) {
-        console.log("🔑 Generating RSA Keys...");
         const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
             modulusLength: 2048,
             publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -103,7 +97,6 @@ function generateRSAKeys() {
         });
         fs.writeFileSync(PRIVATE_KEY_PATH, privateKey);
         fs.writeFileSync(PUBLIC_KEY_PATH, publicKey);
-        console.log("✅ RSA Keys Generated.");
     }
 }
 generateRSAKeys();
@@ -114,18 +107,15 @@ function convertToAppHash(plainPassword) {
 }
 
 // ====================================================================
-//  💾 AUTOMATED DAILY BACKUP
+//  💾 AUTOMATED BACKUP & SAFETY NET
 // ====================================================================
 async function performBackup() {
-    console.log("💾 Starting Daily Backup...");
     try {
         const backupDir = path.join(__dirname, 'backups');
         if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
-
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const backupFile = path.join(backupDir, `backup-${timestamp}.json`);
 
-        // Fetch all critical data
         const [users, logs, blacklistDL, blacklistRC] = await Promise.all([
             User.findAll(),
             Log.findAll(),
@@ -133,198 +123,122 @@ async function performBackup() {
             RC.findAll({ where: { verification: 'blacklisted' } })
         ]);
 
-        const backupData = {
-            date: new Date(),
-            users,
-            logs,
-            blacklist: { dl: blacklistDL, rc: blacklistRC }
-        };
-
+        const backupData = { date: new Date(), users, logs, blacklist: { dl: blacklistDL, rc: blacklistRC } };
         fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
-        console.log(`✅ Backup successful: ${backupFile}`);
         
-        // Cleanup old backups (Keep last 7 days)
         const files = fs.readdirSync(backupDir);
-        if (files.length > 7) {
-            fs.unlinkSync(path.join(backupDir, files[0]));
-        }
-
-    } catch (err) {
-        console.error("❌ Backup Failed:", err);
-    }
+        if (files.length > 7) fs.unlinkSync(path.join(backupDir, files[0]));
+    } catch (err) { console.error("❌ Backup Failed:", err); }
 }
-
-// Schedule Backup (Every 24 Hours)
 setInterval(performBackup, 24 * 60 * 60 * 1000);
 
-// ====================================================================
-//  🛡️ SAFETY NET: Create Default Admin
-// ====================================================================
 async function createDefaultAdmin() {
     try {
         const count = await User.count();
         if (count === 0) {
-            console.log("⚠️ No users found! Creating default Super Admin...");
-            
             const defaultEmail = "admin@netrasarathi.com";
             const defaultPass = "admin123"; 
-            const defaultName = "System Admin";
-
-            // 1. Convert to App-style Hash first (Using the CORRECT Salt)
-            const appHash = convertToAppHash(defaultPass);
             
-            // 2. Encrypt for Database
+            const appHash = convertToAppHash(defaultPass);
             const finalPassword = await bcrypt.hash(appHash + PASSWORD_PEPPER, 10);
 
             await User.create({
-                name: defaultName,
+                name: "System Admin",
                 email: defaultEmail,
                 password: finalPassword,
-                role: 'superadmin'
+                role: 'superadmin',
+                lastActive: new Date()
             });
-
-            console.log(`✅ Default Admin Created! Login with: ${defaultEmail} / ${defaultPass}`);
-        } else {
-            console.log("✅ Users exist. Database is ready.");
+            console.log(`✅ Default Admin Created: ${defaultEmail}`);
         }
-    } catch (err) {
-        console.error("❌ Error creating default admin:", err);
-    }
+    } catch (err) { console.error("❌ Error creating default admin:", err); }
 }
 
-connectDB().then(() => {
-    createDefaultAdmin();
-});
+connectDB().then(() => { createDefaultAdmin(); });
 
 // ====================================================================
-//  WebSocket & Status Logic
-// ====================================================================
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-const activeConnections = new Map();
-const disconnectTimers = new Map();
-
-function broadcastUpdate() {
-    const message = JSON.stringify({ type: 'USER_STATUS_CHANGE' });
-    wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(message); });
-}
-
-function scheduleDisconnect(userId) {
-    if (disconnectTimers.has(userId)) return;
-    const timer = setTimeout(async () => {
-        try {
-            await User.update({ isActive: false, logoutTime: new Date() }, { where: { id: userId } });
-            activeConnections.delete(userId);
-            disconnectTimers.delete(userId);
-            broadcastUpdate();
-        } catch (err) { console.error(err); }
-    }, 5000);
-    disconnectTimers.set(userId, timer);
-}
-
-function cancelDisconnect(userId) {
-    if (disconnectTimers.has(userId)) {
-        clearTimeout(disconnectTimers.get(userId));
-        disconnectTimers.delete(userId);
-    }
-}
-
-wss.on('connection', (ws) => {
-    ws.isAlive = true;
-    ws.on('pong', () => ws.isAlive = true);
-    ws.on('message', (message) => {
-        try {
-            const data = JSON.parse(message);
-            if (data.type === 'REGISTER' && data.userId) {
-                ws.userId = data.userId;
-                activeConnections.set(data.userId, ws);
-                cancelDisconnect(ws.userId);
-                User.update({ isActive: true }, { where: { id: data.userId } }).then(broadcastUpdate);
-            }
-        } catch (e) {}
-    });
-    ws.on('close', () => { if (ws.userId) scheduleDisconnect(ws.userId); });
-});
-
-setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-        ws.isAlive = false;
-        ws.ping();
-    });
-}, 30000);
-
-// ====================================================================
-//  🔐 AUTH & MIDDLEWARE
+//  🔐 MIDDLEWARE: AUTH & INACTIVITY CHECK
 // ====================================================================
 
-const verifyToken = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) return res.status(403).json({ message: "No token provided" });
     
     const bearerToken = token.startsWith('Bearer ') ? token.split(' ')[1] : token;
     
-    jwt.verify(bearerToken, JWT_SECRET, (err, decoded) => {
-        if (err) return res.status(401).json({ message: "Unauthorized" });
-        req.user = decoded;
+    try {
+        const decoded = jwt.verify(bearerToken, JWT_SECRET);
+        
+        // ✅ INACTIVITY CHECK & FRESH DATA FETCH
+        const user = await User.findByPk(decoded.id);
+        if (!user) return res.status(401).json({ message: "User not found" });
+
+        const lastActiveTime = new Date(user.lastActive).getTime();
+        const currentTime = new Date().getTime();
+
+        if ((currentTime - lastActiveTime) > INACTIVITY_LIMIT) {
+            // Session Expired
+            await User.update({ isActive: false }, { where: { id: user.id } });
+            return res.status(401).json({ message: "Session expired due to inactivity. Please login again." });
+        }
+
+        // ✅ Update lastActive time
+        await User.update({ lastActive: new Date() }, { where: { id: user.id } });
+        
+        // Use fresh user object from DB (handles role changes instantly)
+        req.user = user.toJSON(); 
+        
         next();
-    });
+
+    } catch (err) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
 };
 
 const verifySuperAdmin = (req, res, next) => {
+    // Now req.user comes directly from DB, so this check is always accurate
     if (!req.user || req.user.role !== 'superadmin') {
         return res.status(403).json({ message: "Forbidden: Super Admin Access Required" });
     }
     next();
 };
 
-app.get('/api/auth/public-key', (req, res) => {
-    if (fs.existsSync(PUBLIC_KEY_PATH)) res.json({ publicKey: fs.readFileSync(PUBLIC_KEY_PATH, 'utf8') });
-    else res.status(500).json({ message: "Keys not ready" });
-});
+// ====================================================================
+//  USER ROUTES
+// ====================================================================
 
-// ✅ FIX: SECURE LOGIN WITH DOMAIN RESTRICTION & SOURCE TRACKING
+// ✅ LOGIN (Sets Initial Activity)
 app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
     
-    // 1. Domain Check
-    if (!isDomainAllowed(email)) {
-        return res.status(403).json({ message: "Access Denied: Domain not authorized." });
-    }
-
-    // 2. Capture Source
-    const source = getRequestSource(req);
-    console.log(`Login Attempt from: ${source} | User: ${email}`);
+    if (!isDomainAllowed(email)) return res.status(403).json({ message: "Access Denied: Domain not authorized." });
 
     try {
         const user = await User.findOne({ where: { email } });
         if (!user) return res.status(401).json({ message: "Invalid credentials" });
         
-        // Detect if input is already hashed (App sends 64-char Hex string)
+        // 1. Handle Hashes (App vs Web)
         const isAppHash = /^[a-f0-9]{64}$/i.test(password);
-        
         let passwordToVerify = password;
         if (!isAppHash) {
-            // Web Login (Plain Text) -> Convert to App Hash format
             passwordToVerify = convertToAppHash(password);
         }
 
-        // Now verify against DB (which stores bcrypt of AppHash)
         const isMatch = await bcrypt.compare(passwordToVerify + PASSWORD_PEPPER, user.password);
-        
         if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
         
-        // 3. Update User status
+        // 2. Update Tracking
         await User.update({ 
             isActive: true, 
-            loginTime: new Date() 
+            loginTime: new Date(),
+            lastActive: new Date() // Reset inactivity timer
         }, { where: { id: user.id } });
 
-        // 4. Issue 1 Hour Token
+        // 3. Long-Lived Token (Server enforces inactivity, not token)
         const token = jwt.sign(
             { id: user.id, role: user.role }, 
             JWT_SECRET, 
-            { expiresIn: '1h' }
+            { expiresIn: '24h' } 
         );
 
         res.json({ message: "Login successful", token, userId: user.id, role: user.role, name: user.name });
@@ -335,41 +249,46 @@ app.post('/login', loginLimiter, async (req, res) => {
 });
 
 app.post('/api/logout/:userId', async (req, res) => {
-    const { userId } = req.params;
     try {
-        if (disconnectTimers.has(userId)) { clearTimeout(disconnectTimers.get(userId)); disconnectTimers.delete(userId); }
-        
-        await User.update({ 
-            isActive: false, 
-            logoutTime: new Date() 
-        }, { where: { id: userId } });
-
-        if (activeConnections.has(userId)) { activeConnections.get(userId).terminate(); activeConnections.delete(userId); }
-        broadcastUpdate();
+        await User.update({ isActive: false, logoutTime: new Date() }, { where: { id: req.params.userId } });
         res.json({ message: "Logged out" });
     } catch (err) { res.status(500).json({ message: "Logout failed" }); }
 });
 
-app.post('/api/status/inactive', (req, res) => {
-    try {
-        let bodyData = req.body;
-        if (typeof req.body === 'string') {
-             try { bodyData = JSON.parse(req.body); } catch(e) {}
-        }
-        let userId = bodyData.userId;
-        if(userId) scheduleDisconnect(userId);
-        res.status(200).send('OK');
-    } catch(e) { res.status(200).send('Error'); }
-});
+// ✅ ADD USER (Fix Double Hashing Logic)
+app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
+    const { name, email, password, role } = req.body;
+    
+    if (!isDomainAllowed(email)) return res.status(400).json({ message: "Domain not allowed." });
 
-// ====================================================================
-//  USER MANAGEMENT (SECURED)
-// ====================================================================
+    try {
+        const existing = await User.findOne({ where: { email } });
+        if (existing) return res.status(409).json({ message: "Email exists" });
+        
+        // 1. Check if input is ALREADY a hash (from future App updates)
+        const isInputAlreadyHashed = /^[a-f0-9]{64}$/i.test(password);
+        let appStyleHash;
+
+        if (isInputAlreadyHashed) {
+            // If input looks like a hash (64 chars), assume it IS the App Hash
+            appStyleHash = password;
+        } else {
+            // If input is plain text (Admin UI), convert it to App Hash first
+            appStyleHash = convertToAppHash(password);
+        }
+        
+        // 2. Encrypt result with Bcrypt (Storage format)
+        const hashedPassword = await bcrypt.hash(appStyleHash + PASSWORD_PEPPER, 10);
+        
+        const newUser = await User.create({ name, email, password: hashedPassword, role, lastActive: new Date() });
+        res.status(201).json({ message: "User added", userId: newUser.id });
+    } catch (err) { res.status(500).json({ message: "Error adding user" }); }
+});
 
 app.get('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     try { 
         const users = await User.findAll({ 
-            attributes: ['id', 'name', 'email', 'role', 'isActive', 'loginTime'],
+            attributes: ['id', 'name', 'email', 'role', 'isActive', 'loginTime', 'lastActive'],
             order: [['id', 'ASC']] 
         }); 
         res.json(users); 
@@ -377,91 +296,36 @@ app.get('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     catch (err) { res.status(500).json({ message: "Fetch failed" }); }
 });
 
-app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
-    const { name, email, password, role } = req.body;
-    
-    if (!isDomainAllowed(email)) {
-        return res.status(400).json({ message: "Email domain not allowed. Use netrasarathi.com, gmail.com, or yahoo.com" });
-    }
-
-    try {
-        const existing = await User.findOne({ where: { email } });
-        if (existing) return res.status(409).json({ message: "Email exists" });
-        
-        const appStyleHash = convertToAppHash(password);
-        const hashedPassword = await bcrypt.hash(appStyleHash + PASSWORD_PEPPER, 10);
-        
-        const newUser = await User.create({ name, email, password: hashedPassword, role });
-        broadcastUpdate();
-        res.status(201).json({ message: "User added", userId: newUser.id });
-    } catch (err) { res.status(500).json({ message: "Error adding user" }); }
-});
-
 app.put('/api/users/:userId/role', verifyToken, verifySuperAdmin, async (req, res) => {
-    const { userId } = req.params;
-    const { newRole } = req.body; 
     try {
-        const user = await User.findByPk(userId);
+        const user = await User.findByPk(req.params.userId);
         if (!user) return res.status(404).json({ message: "User not found" });
-        if (user.role === 'superadmin' && newRole !== 'superadmin') {
+        if (user.role === 'superadmin' && req.body.newRole !== 'superadmin') {
              const adminCount = await User.count({ where: { role: 'superadmin' } });
              if (adminCount <= 1) return res.status(403).json({ message: "Cannot remove the last Super Admin" });
         }
-        user.role = newRole;
+        user.role = req.body.newRole;
         await user.save();
-        broadcastUpdate();
-        res.json({ message: "User role updated successfully" });
+        res.json({ message: "Role updated" });
     } catch (err) { res.status(500).json({ message: "Error updating role" }); }
 });
 
 app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res) => {
-    const { userId } = req.params;
     try {
-        const user = await User.findByPk(userId);
+        const user = await User.findByPk(req.params.userId);
         if (!user) return res.status(404).json({ message: "User not found" });
         if (user.role === 'superadmin') {
             const count = await User.count({ where: { role: 'superadmin' } });
             if (count <= 1) return res.status(403).json({ message: "Cannot delete last superadmin" });
         }
         await user.destroy();
-        broadcastUpdate();
         res.json({ message: "User deleted" });
     } catch (err) { res.status(500).json({ message: "Error deleting user" }); }
 });
 
 // ====================================================================
-//  BLACKLIST & OCR (SECURED)
+//  BLACKLIST & OCR
 // ====================================================================
-
-app.post('/api/admin/bulk-dl', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).json({ message: "Upload CSV" });
-    const results = [];
-    fs.createReadStream(req.file.path).pipe(csv()).on('data', (data) => {
-        const keys = Object.keys(data);
-        const dlKey = keys.find(k => /(dl|license)/i.test(k));
-        const nameKey = keys.find(k => /name/i.test(k));
-        if(dlKey) results.push({ dl_number: data[dlKey].replace(/[^a-zA-Z0-9]/g, '').toUpperCase(), name: nameKey?data[nameKey]:"Unknown", Verification: 'blacklisted', crime_involved: 'Bulk Import' });
-    }).on('end', async () => {
-        await License.bulkCreate(results, { updateOnDuplicate: ['Verification'] });
-        res.json({ message: "Imported" });
-        if (req.file) fs.unlinkSync(req.file.path);
-    });
-});
-
-app.post('/api/admin/bulk-rc', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).json({ message: "Upload CSV" });
-    const results = [];
-    fs.createReadStream(req.file.path).pipe(csv()).on('data', (data) => {
-        const keys = Object.keys(data);
-        const rcKey = keys.find(k => /(rc|regn)/i.test(k));
-        const ownerKey = keys.find(k => /(owner|name)/i.test(k));
-        if(rcKey) results.push({ regn_number: data[rcKey].replace(/[^a-zA-Z0-9]/g, '').toUpperCase(), owner_name: ownerKey?data[ownerKey]:"Unknown", verification: 'blacklisted', crime_involved: 'Bulk Import' });
-    }).on('end', async () => {
-        await RC.bulkCreate(results, { updateOnDuplicate: ['verification'] });
-        res.json({ message: "Imported" });
-        if (req.file) fs.unlinkSync(req.file.path);
-    });
-});
 
 app.post('/api/blacklist', verifyToken, async (req, res) => {
     const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
@@ -474,17 +338,13 @@ app.post('/api/blacklist', verifyToken, async (req, res) => {
 });
 
 app.get('/api/blacklist/dl', verifyToken, async (req, res) => {
-    const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
-    const where = { Verification: 'blacklisted' }; if (search) where.dl_number = { [Op.iLike]: `%${search}%` };
-    const { count, rows } = await License.findAndCountAll({ where, limit, offset });
-    res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
+    const { count, rows } = await License.findAndCountAll({ where: { Verification: 'blacklisted' }, limit: 50 });
+    res.json({ data: rows, total: count });
 });
 
 app.get('/api/blacklist/rc', verifyToken, async (req, res) => {
-    const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
-    const where = { verification: 'blacklisted' }; if (search) where.regn_number = { [Op.iLike]: `%${search}%` };
-    const { count, rows } = await RC.findAndCountAll({ where, limit, offset });
-    res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
+    const { count, rows } = await RC.findAndCountAll({ where: { verification: 'blacklisted' }, limit: 50 });
+    res.json({ data: rows, total: count });
 });
 
 app.put('/api/blacklist/:type/:id', verifyToken, verifySuperAdmin, async (req, res) => {
@@ -534,7 +394,7 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
 
         const logEntry = { 
             timestamp: new Date(), 
-            scanned_by: source, // ✅ Log "Mobile App" or "Web Portal"
+            scanned_by: source, 
             location: location || 'Unknown', 
             tollgate: tollgate || 'Unknown' 
         };
@@ -561,12 +421,9 @@ app.get('/api/logs', async (req, res) => {
     catch (err) { res.status(500).json({ message: "Error fetching logs" }); }
 });
 
-function keepAlive() {
-    https.get(process.env.APP_URL, (res) => {}).on('error', () => {});
-}
-setInterval(keepAlive, 5 * 60 * 1000);
+// Keep Alive & Start
+app.post('/api/status/inactive', (req, res) => { res.status(200).send('OK'); }); // Simple ping
 
 server.listen(port, () => {
     console.log(`🌐 Netra Sarathi Secure Server Running on Port: ${port}`);
-    keepAlive();
 });
