@@ -4,7 +4,6 @@ const { Sequelize, DataTypes, Op } = require('sequelize');
 let sequelize;
 
 if (process.env.DATABASE_URL) {
-  // ☁️ CLOUD MODE (Render)
   console.log("☁️ Detected Cloud URL. Connecting to Render...");
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
@@ -12,12 +11,11 @@ if (process.env.DATABASE_URL) {
     dialectOptions: {
       ssl: {
         require: true,
-        rejectUnauthorized: false // Required for Render
+        rejectUnauthorized: false
       }
     }
   });
 } else {
-  // 💻 LOCAL MODE
   console.log("💻 No Cloud URL found. Connecting to Localhost...");
   sequelize = new Sequelize('netra_sarathi_db', 'postgres', 'password', {
     host: 'localhost',
@@ -34,7 +32,9 @@ const User = sequelize.define('User', {
   role: { type: DataTypes.STRING, defaultValue: 'operator' },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'isActive' },
   loginTime: { type: DataTypes.DATE, field: 'loginTime' },
-  logoutTime: { type: DataTypes.DATE, field: 'logoutTime' }
+  logoutTime: { type: DataTypes.DATE, field: 'logoutTime' },
+  // ✅ NEW FIELD: Tracks the last time the user made a request
+  lastActive: { type: DataTypes.DATE, field: 'lastActive', defaultValue: Sequelize.NOW } 
 }, { tableName: 'Users', timestamps: true, createdAt: 'createdAt', updatedAt: 'updatedAt' });
 
 const License = sequelize.define('License', {
@@ -81,7 +81,7 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log('✅ Connection successful!');
     await sequelize.sync({ alter: true }); 
-    console.log('✅ Models Synced (Tables Created)');
+    console.log('✅ Models Synced (Tables Updated)');
   } catch (err) {
     console.error('❌ Database Connection Error:', err);
   }
