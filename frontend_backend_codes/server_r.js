@@ -15,7 +15,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
 const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit');
-const { exec } = require('child_process'); // ✅ Added for Suspect Script
+const { exec } = require('child_process'); 
 
 // ✅ IMPORT DB MODULE
 const { User, License, RC, Log, connectDB, Op } = require('./db');
@@ -32,6 +32,7 @@ app.use(helmet());
 // CORS SETUP
 const allowedOrigins = [
     process.env.APP_URL, 
+    'https://ai-tollgate-surveillance-1.onrender.com', // Added your domain
     'http://127.0.0.1:5500',
     'http://localhost:3000'
 ];
@@ -108,6 +109,25 @@ function convertToAppHash(plainPassword) {
 }
 
 // ====================================================================
+//  ⏰ AUTO-PING (PREVENT SLEEP) - Runs every 12 Minutes
+// ====================================================================
+const RENDER_URL = 'https://ai-tollgate-surveillance-1.onrender.com';
+
+function autoPing() {
+    console.log(`🔄 Auto-Ping: Keeping server alive... (${new Date().toISOString()})`);
+    https.get(RENDER_URL, (res) => {
+        // Just consume the response to keep connection active
+        res.on('data', () => {}); 
+        res.on('end', () => {});
+    }).on('error', (err) => {
+        console.error(`⚠️ Auto-Ping Failed: ${err.message}`);
+    });
+}
+
+// 12 Minutes Interval (12 * 60 * 1000 ms)
+setInterval(autoPing, 12 * 60 * 1000);
+
+// ====================================================================
 //  💾 AUTOMATED BACKUP & SAFETY NET
 // ====================================================================
 async function performBackup() {
@@ -159,6 +179,8 @@ async function createDefaultAdmin() {
 
 connectDB().then(() => { 
     createDefaultAdmin();
+    // Run initial ping 1 minute after start
+    setTimeout(autoPing, 60000);
 });
 
 // ====================================================================
@@ -380,7 +402,6 @@ app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res)
 //  BLACKLIST & OCR (SECURED + RESTORED FEATURES)
 // ====================================================================
 
-// ✅ 1. Manual Blacklist (Secured)
 app.post('/api/blacklist', verifyToken, async (req, res) => {
     const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
     const cleaned = number.replace(/\s|-/g, '').toUpperCase();
@@ -391,7 +412,6 @@ app.post('/api/blacklist', verifyToken, async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
-// ✅ 2. View Blacklist (Secured)
 app.get('/api/blacklist/dl', verifyToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
     const where = { Verification: 'blacklisted' }; if (search) where.dl_number = { [Op.iLike]: `%${search}%` };
@@ -406,7 +426,6 @@ app.get('/api/blacklist/rc', verifyToken, async (req, res) => {
     res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
 });
 
-// ✅ 3. Un-Blacklist / Mark Valid (RESTORED & SECURED)
 app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     const { type, id } = req.params;
     try {
@@ -419,7 +438,6 @@ app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     } catch(err) { res.status(500).json({message: "Error updating status"}); }
 });
 
-// ✅ 4. Suspect Photo Upload (RESTORED & SECURED)
 app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (req, res) => {
     const { name } = req.body;
     const photo = req.file;
@@ -429,7 +447,6 @@ app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (r
         return res.status(400).json({ message: 'Suspect name and photo are required.' });
     }
 
-    // Look for face_recognition_api in parent dir
     const faceApiPath = path.join(__dirname, '..', 'face_recognition_api');
     
     if (!fs.existsSync(faceApiPath)) {
@@ -448,10 +465,8 @@ app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (r
         const newPhotoName = `${suspectDirName}_${Date.now()}${fileExtension}`;
         const newPhotoPath = path.join(suspectDirPath, newPhotoName);
         
-        // Move file from uploads/ to suspect dir
         fs.renameSync(photo.path, newPhotoPath);
 
-        // Trigger Python Build Script
         const buildScriptPath = path.join(faceApiPath, 'tools', 'build_embeddings.py');
         exec(`python "${buildScriptPath}"`, { cwd: faceApiPath }, (error, stdout, stderr) => {
             if (error) console.error(`Build Script Error: ${error.message}`);
@@ -467,7 +482,6 @@ app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (r
     }
 });
 
-// ✅ 5. Bulk Import (Secured)
 app.post('/api/admin/bulk-dl', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: "Upload CSV" });
     const results = [];
@@ -498,10 +512,6 @@ app.post('/api/admin/bulk-rc', verifyToken, verifySuperAdmin, upload.single('fil
     });
 });
 
-// ====================================================================
-//  OCR & VERIFICATION (SECURED)
-// ====================================================================
-
 app.post('/api/ocr/dl', upload.single('dlImage'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "File required" });
     try {
@@ -528,35 +538,11 @@ app.post('/api/ocr/rc', upload.single('rcImage'), async (req, res) => {
     finally { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
 });
 
-// ✅ 6. Helper Functions for Verification
-async function getDLData(raw) {
-    if (!raw) return { status: "no_data_provided" };
-    const dlNum = raw.replace(/\s|-/g, '').toUpperCase();
-    const dl = await License.findOne({ where: { dl_number: dlNum } });
-    if (dl) return { status: dl.Verification, licenseNumber: dl.dl_number, name: dl.name, phone_number: dl.phone_number };
-    return { status: "not_found", licenseNumber: dlNum };
-}
-async function getRCData(raw) {
-    if (!raw) return { status: "no_data_provided" };
-    const rcNum = raw.replace(/\s|-/g, '').toUpperCase();
-    const rc = await RC.findOne({ where: { regn_number: rcNum } });
-    if (rc) return { ...rc.toJSON(), status: rc.verification };
-    return { status: "not_found", regn_number: rcNum };
-}
-async function getFaceDataFromPython(path) {
-    try {
-        const form = new FormData();
-        form.append('file', fs.createReadStream(path)); 
-        const res = await axiosClient.post(process.env.PYTHON_FACE_SERVICE_URL, form, { headers: { ...form.getHeaders() } });
-        return { status: res.data.status || 'UNKNOWN', name: res.data.closest_match || "Unknown", score: res.data.score };
-    } catch (e) { return { status: 'SERVICE_UNAVAILABLE' }; }
-}
-
 // ✅ 7. Verify Endpoint with "3 Vehicles in 2 Days" Logic
 app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { name: 'dlImage', maxCount: 1 }, { name: 'rcImage', maxCount: 1 }]), async (req, res) => {
     const { dl_number, rc_number, location, tollgate } = req.body;
     const driverImage = req.files && req.files['driverImage'] ? req.files['driverImage'][0] : null;
-    const source = getRequestSource(req); // Source Tracking
+    const source = getRequestSource(req); 
 
     try {
         const [dlData, rcData, driverData] = await Promise.all([
@@ -580,12 +566,10 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
 
         let suspicious = (dlData?.status === 'blacklisted' || rcData?.status === 'blacklisted');
 
-        // ✅ SUSPICIOUS USAGE CHECK (3 Vehicles in 2 Days)
         if (!suspicious && dlData && dlData.status !== 'blacklisted' && dlData.licenseNumber) {
             const twoDaysAgo = new Date();
             twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
             
-            // Find unique vehicles scanned by this DL in last 2 days
             const recentLogs = await Log.findAll({
                 where: {
                     dl_number: dlData.licenseNumber,
@@ -621,7 +605,6 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
     }
 });
 
-// ✅ 8. DL Usage History Endpoint (Restored)
 app.get('/api/dl-usage/:dl_number', verifyToken, async (req, res) => {
     const { dl_number } = req.params;
     const twoDaysAgo = new Date();
