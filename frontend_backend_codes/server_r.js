@@ -15,6 +15,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
 const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit');
+const { exec } = require('child_process'); // ✅ Added for Suspect Script
 
 // ✅ IMPORT DB MODULE
 const { User, License, RC, Log, connectDB, Op } = require('./db');
@@ -22,7 +23,7 @@ const { User, License, RC, Log, connectDB, Op } = require('./db');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ CREATE HTTP SERVER (Critical for WebSockets)
+// ✅ CREATE HTTP SERVER
 const server = http.createServer(app);
 
 // SECURITY HEADERS
@@ -58,11 +59,8 @@ const upload = multer({
 // ====================================================================
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
-// Exact salt from your Flutter code
 const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; 
-
-// 1 HOUR Inactivity Limit (in milliseconds)
-const INACTIVITY_LIMIT = 60 * 60 * 1000; 
+const INACTIVITY_LIMIT = 60 * 60 * 1000; // 1 Hour
 
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
 
@@ -105,7 +103,6 @@ function generateRSAKeys() {
 }
 generateRSAKeys();
 
-// Helper: Mimic Flutter Hashing
 function convertToAppHash(plainPassword) {
     return crypto.createHash('sha256').update(plainPassword + DART_CLIENT_SALT).digest('hex');
 }
@@ -130,13 +127,10 @@ async function performBackup() {
         const backupData = { date: new Date(), users, logs, blacklist: { dl: blacklistDL, rc: blacklistRC } };
         fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
         
-        // Keep only last 7 backups
         const files = fs.readdirSync(backupDir);
         if (files.length > 7) fs.unlinkSync(path.join(backupDir, files[0]));
-        console.log(`✅ Daily Backup Completed: ${backupFile}`);
     } catch (err) { console.error("❌ Backup Failed:", err); }
 }
-// Schedule Backup (Every 24 Hours)
 setInterval(performBackup, 24 * 60 * 60 * 1000);
 
 async function createDefaultAdmin() {
@@ -146,7 +140,6 @@ async function createDefaultAdmin() {
             const defaultEmail = "admin@netrasarathi.com";
             const defaultPass = "admin123"; 
             
-            // Use APP HASH format for default user too
             const appHash = convertToAppHash(defaultPass);
             const finalPassword = await bcrypt.hash(appHash + PASSWORD_PEPPER, 10);
 
@@ -159,14 +152,13 @@ async function createDefaultAdmin() {
                 lastActive: new Date(),
                 loginTime: new Date()
             });
-            console.log(`✅ Default Admin Created: ${defaultEmail} / ${defaultPass}`);
+            console.log(`✅ Default Admin Created: ${defaultEmail}`);
         }
     } catch (err) { console.error("❌ Error creating default admin:", err); }
 }
 
 connectDB().then(() => { 
     createDefaultAdmin();
-    // performBackup(); // Uncomment to run backup immediately on start
 });
 
 // ====================================================================
@@ -239,23 +231,18 @@ const verifyToken = async (req, res, next) => {
     try {
         const decoded = jwt.verify(bearerToken, JWT_SECRET);
         
-        // ✅ INACTIVITY CHECK & FRESH DATA FETCH
         const user = await User.findByPk(decoded.id);
         if (!user) return res.status(401).json({ message: "User not found" });
 
         const lastActiveTime = new Date(user.lastActive).getTime();
         const currentTime = new Date().getTime();
 
-        // Check 1 Hour Inactivity
         if ((currentTime - lastActiveTime) > INACTIVITY_LIMIT) {
             await User.update({ isActive: false }, { where: { id: user.id } });
             return res.status(401).json({ message: "Session expired due to inactivity. Please login again." });
         }
 
-        // Update lastActive
         await User.update({ lastActive: new Date() }, { where: { id: user.id } });
-        
-        // Pass fresh user object (handles role changes instantly)
         req.user = user.toJSON(); 
         next();
 
@@ -265,7 +252,6 @@ const verifyToken = async (req, res, next) => {
 };
 
 const verifySuperAdmin = (req, res, next) => {
-    // req.user is populated by verifyToken from the DB
     if (!req.user || req.user.role !== 'superadmin') {
         return res.status(403).json({ message: "Forbidden: Super Admin Access Required" });
     }
@@ -281,13 +267,11 @@ app.get('/api/auth/public-key', (req, res) => {
 //  USER ROUTES
 // ====================================================================
 
-// ✅ LOGIN (Sets Initial Activity & Logs Source)
 app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
     
     if (!isDomainAllowed(email)) return res.status(403).json({ message: "Access Denied: Domain not authorized." });
 
-    // Capture Source
     const source = getRequestSource(req);
     console.log(`Login Attempt | User: ${email} | Source: ${source}`);
 
@@ -295,25 +279,21 @@ app.post('/login', loginLimiter, async (req, res) => {
         const user = await User.findOne({ where: { email } });
         if (!user) return res.status(401).json({ message: "Invalid credentials" });
         
-        // 1. Handle Hashes (App vs Web)
         const isAppHash = /^[a-f0-9]{64}$/i.test(password);
         let passwordToVerify = password;
         if (!isAppHash) {
-            // Web Login (Plain Text) -> Convert to App Hash format
             passwordToVerify = convertToAppHash(password);
         }
 
         const isMatch = await bcrypt.compare(passwordToVerify + PASSWORD_PEPPER, user.password);
         if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
         
-        // 2. Update Tracking
         await User.update({ 
             isActive: true, 
             loginTime: new Date(),
             lastActive: new Date() 
         }, { where: { id: user.id } });
 
-        // 3. Long-Lived Token (24h) - Inactivity handled by middleware
         const token = jwt.sign(
             { id: user.id, role: user.role }, 
             JWT_SECRET, 
@@ -330,7 +310,6 @@ app.post('/login', loginLimiter, async (req, res) => {
 app.post('/api/logout/:userId', async (req, res) => {
     try {
         await User.update({ isActive: false, logoutTime: new Date() }, { where: { id: req.params.userId } });
-        
         if (activeConnections.has(req.params.userId)) { 
              activeConnections.get(req.params.userId).terminate(); 
              activeConnections.delete(req.params.userId); 
@@ -340,7 +319,6 @@ app.post('/api/logout/:userId', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Logout failed" }); }
 });
 
-// ✅ ADD USER (Fix Double Hashing Logic & Domain Check)
 app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
     const { name, email, password, role } = req.body;
     
@@ -350,21 +328,12 @@ app.post('/api/users', verifyToken, verifySuperAdmin, async (req, res) => {
         const existing = await User.findOne({ where: { email } });
         if (existing) return res.status(409).json({ message: "Email exists" });
         
-        // 1. Smart Hash Detection
         const isInputAlreadyHashed = /^[a-f0-9]{64}$/i.test(password);
-        let appStyleHash;
-
-        if (isInputAlreadyHashed) {
-            appStyleHash = password; // Use as-is
-        } else {
-            appStyleHash = convertToAppHash(password); // Convert plain -> App Hash
-        }
+        let appStyleHash = isInputAlreadyHashed ? password : convertToAppHash(password);
         
-        // 2. Encrypt for DB
         const hashedPassword = await bcrypt.hash(appStyleHash + PASSWORD_PEPPER, 10);
         
         const newUser = await User.create({ name, email, password: hashedPassword, role, lastActive: new Date() });
-        broadcastUpdate();
         res.status(201).json({ message: "User added", userId: newUser.id });
     } catch (err) { res.status(500).json({ message: "Error adding user" }); }
 });
@@ -384,15 +353,12 @@ app.put('/api/users/:userId/role', verifyToken, verifySuperAdmin, async (req, re
     try {
         const user = await User.findByPk(req.params.userId);
         if (!user) return res.status(404).json({ message: "User not found" });
-        
         if (user.role === 'superadmin' && req.body.newRole !== 'superadmin') {
              const adminCount = await User.count({ where: { role: 'superadmin' } });
              if (adminCount <= 1) return res.status(403).json({ message: "Cannot remove the last Super Admin" });
         }
-        
         user.role = req.body.newRole;
         await user.save();
-        broadcastUpdate();
         res.json({ message: "Role updated" });
     } catch (err) { res.status(500).json({ message: "Error updating role" }); }
 });
@@ -401,21 +367,107 @@ app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res)
     try {
         const user = await User.findByPk(req.params.userId);
         if (!user) return res.status(404).json({ message: "User not found" });
-        
         if (user.role === 'superadmin') {
             const count = await User.count({ where: { role: 'superadmin' } });
             if (count <= 1) return res.status(403).json({ message: "Cannot delete last superadmin" });
         }
-        
         await user.destroy();
         res.json({ message: "User deleted" });
     } catch (err) { res.status(500).json({ message: "Error deleting user" }); }
 });
 
 // ====================================================================
-//  BLACKLIST & OCR (SECURED)
+//  BLACKLIST & OCR (SECURED + RESTORED FEATURES)
 // ====================================================================
 
+// ✅ 1. Manual Blacklist (Secured)
+app.post('/api/blacklist', verifyToken, async (req, res) => {
+    const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
+    const cleaned = number.replace(/\s|-/g, '').toUpperCase();
+    try {
+        if (type === 'dl') await License.upsert({ dl_number: cleaned, Verification: "blacklisted", name: name||'N/A', phone_number: phone_number||'N/A', crime_involved: crime_involved||'Manual' });
+        else await RC.upsert({ regn_number: cleaned, verification: "blacklisted", owner_name: owner_name||'N/A', crime_involved: crime_involved||'Manual' });
+        res.json({ message: "Added" });
+    } catch (err) { res.status(500).json({ message: "Error" }); }
+});
+
+// ✅ 2. View Blacklist (Secured)
+app.get('/api/blacklist/dl', verifyToken, async (req, res) => {
+    const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
+    const where = { Verification: 'blacklisted' }; if (search) where.dl_number = { [Op.iLike]: `%${search}%` };
+    const { count, rows } = await License.findAndCountAll({ where, limit, offset });
+    res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
+});
+
+app.get('/api/blacklist/rc', verifyToken, async (req, res) => {
+    const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 50; const offset = (page - 1) * limit; const search = req.query.search ? req.query.search.trim() : "";
+    const where = { verification: 'blacklisted' }; if (search) where.regn_number = { [Op.iLike]: `%${search}%` };
+    const { count, rows } = await RC.findAndCountAll({ where, limit, offset });
+    res.json({ data: rows, total: count, page, pages: Math.ceil(count / limit) });
+});
+
+// ✅ 3. Un-Blacklist / Mark Valid (RESTORED & SECURED)
+app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
+    const { type, id } = req.params;
+    try {
+        let result;
+        if (type === 'dl') result = await License.update({ Verification: 'valid' }, { where: { id: id } });
+        else if (type === 'rc') result = await RC.update({ verification: 'valid' }, { where: { id: id } });
+        
+        if (result[0] > 0) res.json({ message: "Marked as valid" });
+        else res.status(404).json({ message: "Entry not found" });
+    } catch(err) { res.status(500).json({message: "Error updating status"}); }
+});
+
+// ✅ 4. Suspect Photo Upload (RESTORED & SECURED)
+app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (req, res) => {
+    const { name } = req.body;
+    const photo = req.file;
+
+    if (!name || !photo) {
+        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
+        return res.status(400).json({ message: 'Suspect name and photo are required.' });
+    }
+
+    // Look for face_recognition_api in parent dir
+    const faceApiPath = path.join(__dirname, '..', 'face_recognition_api');
+    
+    if (!fs.existsSync(faceApiPath)) {
+        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
+        return res.status(500).json({ message: "Face recognition system not found on server." });
+    }
+    
+    const knownFacesDir = path.join(faceApiPath, 'app', 'known_faces');
+    const suspectDirName = name.trim().replace(/\s+/g, '_');
+    const suspectDirPath = path.join(knownFacesDir, suspectDirName);
+
+    try {
+        if (!fs.existsSync(suspectDirPath)) fs.mkdirSync(suspectDirPath, { recursive: true });
+
+        const fileExtension = path.extname(photo.originalname) || '.jpg';
+        const newPhotoName = `${suspectDirName}_${Date.now()}${fileExtension}`;
+        const newPhotoPath = path.join(suspectDirPath, newPhotoName);
+        
+        // Move file from uploads/ to suspect dir
+        fs.renameSync(photo.path, newPhotoPath);
+
+        // Trigger Python Build Script
+        const buildScriptPath = path.join(faceApiPath, 'tools', 'build_embeddings.py');
+        exec(`python "${buildScriptPath}"`, { cwd: faceApiPath }, (error, stdout, stderr) => {
+            if (error) console.error(`Build Script Error: ${error.message}`);
+            else console.log(`Model Updated: ${stdout}`);
+        });
+
+        res.status(201).json({ message: `Suspect '${name}' added. Model updating in background.` });
+
+    } catch (err) {
+        console.error("Error adding suspect:", err);
+        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
+        res.status(500).json({ message: "Server error processing photo." });
+    }
+});
+
+// ✅ 5. Bulk Import (Secured)
 app.post('/api/admin/bulk-dl', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: "Upload CSV" });
     const results = [];
@@ -446,29 +498,9 @@ app.post('/api/admin/bulk-rc', verifyToken, verifySuperAdmin, upload.single('fil
     });
 });
 
-app.post('/api/blacklist', verifyToken, async (req, res) => {
-    const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
-    const cleaned = number.replace(/\s|-/g, '').toUpperCase();
-    try {
-        if (type === 'dl') await License.upsert({ dl_number: cleaned, Verification: "blacklisted", name: name||'N/A', phone_number: phone_number||'N/A', crime_involved: crime_involved||'Manual' });
-        else await RC.upsert({ regn_number: cleaned, verification: "blacklisted", owner_name: owner_name||'N/A', crime_involved: crime_involved||'Manual' });
-        res.json({ message: "Added" });
-    } catch (err) { res.status(500).json({ message: "Error" }); }
-});
-
-app.get('/api/blacklist/dl', verifyToken, async (req, res) => {
-    const { count, rows } = await License.findAndCountAll({ where: { Verification: 'blacklisted' }, limit: 50 });
-    res.json({ data: rows, total: count });
-});
-
-app.get('/api/blacklist/rc', verifyToken, async (req, res) => {
-    const { count, rows } = await RC.findAndCountAll({ where: { verification: 'blacklisted' }, limit: 50 });
-    res.json({ data: rows, total: count });
-});
-
-app.put('/api/blacklist/:type/:id', verifyToken, verifySuperAdmin, async (req, res) => {
-    res.status(501).json({message: "Not implemented yet"});
-});
+// ====================================================================
+//  OCR & VERIFICATION (SECURED)
+// ====================================================================
 
 app.post('/api/ocr/dl', upload.single('dlImage'), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "File required" });
@@ -496,13 +528,35 @@ app.post('/api/ocr/rc', upload.single('rcImage'), async (req, res) => {
     finally { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
 });
 
-// ✅ FIX: VERIFY WITH SOURCE TRACKING LOGGING
+// ✅ 6. Helper Functions for Verification
+async function getDLData(raw) {
+    if (!raw) return { status: "no_data_provided" };
+    const dlNum = raw.replace(/\s|-/g, '').toUpperCase();
+    const dl = await License.findOne({ where: { dl_number: dlNum } });
+    if (dl) return { status: dl.Verification, licenseNumber: dl.dl_number, name: dl.name, phone_number: dl.phone_number };
+    return { status: "not_found", licenseNumber: dlNum };
+}
+async function getRCData(raw) {
+    if (!raw) return { status: "no_data_provided" };
+    const rcNum = raw.replace(/\s|-/g, '').toUpperCase();
+    const rc = await RC.findOne({ where: { regn_number: rcNum } });
+    if (rc) return { ...rc.toJSON(), status: rc.verification };
+    return { status: "not_found", regn_number: rcNum };
+}
+async function getFaceDataFromPython(path) {
+    try {
+        const form = new FormData();
+        form.append('file', fs.createReadStream(path)); 
+        const res = await axiosClient.post(process.env.PYTHON_FACE_SERVICE_URL, form, { headers: { ...form.getHeaders() } });
+        return { status: res.data.status || 'UNKNOWN', name: res.data.closest_match || "Unknown", score: res.data.score };
+    } catch (e) { return { status: 'SERVICE_UNAVAILABLE' }; }
+}
+
+// ✅ 7. Verify Endpoint with "3 Vehicles in 2 Days" Logic
 app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { name: 'dlImage', maxCount: 1 }, { name: 'rcImage', maxCount: 1 }]), async (req, res) => {
     const { dl_number, rc_number, location, tollgate } = req.body;
     const driverImage = req.files && req.files['driverImage'] ? req.files['driverImage'][0] : null;
-
-    // Capture Source
-    const source = getRequestSource(req);
+    const source = getRequestSource(req); // Source Tracking
 
     try {
         const [dlData, rcData, driverData] = await Promise.all([
@@ -513,7 +567,7 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
 
         const logEntry = { 
             timestamp: new Date(), 
-            scanned_by: source, 
+            scanned_by: source,
             location: location || 'Unknown', 
             tollgate: tollgate || 'Unknown' 
         };
@@ -525,6 +579,38 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
         if (Object.keys(logEntry).length > 4) await Log.create(logEntry);
 
         let suspicious = (dlData?.status === 'blacklisted' || rcData?.status === 'blacklisted');
+
+        // ✅ SUSPICIOUS USAGE CHECK (3 Vehicles in 2 Days)
+        if (!suspicious && dlData && dlData.status !== 'blacklisted' && dlData.licenseNumber) {
+            const twoDaysAgo = new Date();
+            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+            
+            // Find unique vehicles scanned by this DL in last 2 days
+            const recentLogs = await Log.findAll({
+                where: {
+                    dl_number: dlData.licenseNumber,
+                    timestamp: { [Op.gte]: twoDaysAgo },
+                    vehicle_number: { [Op.ne]: null }
+                }
+            });
+            
+            const uniqueVehicles = new Set(recentLogs.map(l => l.vehicle_number));
+            
+            if (uniqueVehicles.size >= 3) {
+                suspicious = true;
+                await Log.create({
+                    timestamp: new Date(),
+                    dl_number: dlData.licenseNumber,
+                    alert_type: 'Suspicious DL Usage',
+                    description: `DL ${dlData.licenseNumber} used with ${uniqueVehicles.size} different vehicles in last 2 days`,
+                    location: location || 'Unknown',
+                    tollgate: tollgate || 'Unknown',
+                    scanned_by: 'System Alert',
+                    suspicious: true
+                });
+            }
+        }
+
         res.json({ dlData, rcData, driverData, suspicious });
 
     } catch (err) { 
@@ -535,13 +621,33 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
     }
 });
 
+// ✅ 8. DL Usage History Endpoint (Restored)
+app.get('/api/dl-usage/:dl_number', verifyToken, async (req, res) => {
+    const { dl_number } = req.params;
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    
+    try {
+        const logs = await Log.findAll({
+            where: {
+                dl_number: { [Op.iLike]: `%${dl_number}%` },
+                timestamp: { [Op.gte]: twoDaysAgo },
+                vehicle_number: { [Op.ne]: null }
+            },
+            order: [['timestamp', 'DESC']]
+        });
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching DL usage logs." });
+    }
+});
+
 app.get('/api/logs', async (req, res) => {
     try { const logs = await Log.findAll({ order: [['timestamp', 'DESC']] }); res.json(logs); } 
     catch (err) { res.status(500).json({ message: "Error fetching logs" }); }
 });
 
-// Keep Alive & Start
-app.post('/api/status/inactive', (req, res) => { res.status(200).send('OK'); }); // Simple ping
+app.post('/api/status/inactive', (req, res) => { res.status(200).send('OK'); });
 
 server.listen(port, () => {
     console.log(`🌐 Netra Sarathi Secure Server Running on Port: ${port}`);
