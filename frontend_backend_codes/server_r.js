@@ -16,26 +16,21 @@ const jwt = require('jsonwebtoken');
 const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit');
 const { exec } = require('child_process'); 
-
-// ✅ IMPORT DB MODULE
 const { User, License, RC, Log, connectDB, Op } = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-// ✅ CREATE HTTP SERVER
 const server = http.createServer(app);
 
-// SECURITY HEADERS
 app.use(helmet());
 
-// CORS SETUP
 const allowedOrigins = [
     process.env.APP_URL, 
-    'https://ai-tollgate-surveillance-1.onrender.com', // Added your domain
+    'https://ai-tollgate-surveillance-1.onrender.com',
     'http://127.0.0.1:5500',
     'http://localhost:3000'
 ];
+
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
@@ -55,13 +50,10 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-// ====================================================================
-// 🔐 CONFIGURATION
-// ====================================================================
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
 const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; 
-const INACTIVITY_LIMIT = 60 * 60 * 1000; // 1 Hour
+const INACTIVITY_LIMIT = 60 * 60 * 1000; 
 
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
 
@@ -87,7 +79,6 @@ const loginLimiter = rateLimit({
 const httpsAgent = new https.Agent({ keepAlive: true });
 const axiosClient = axios.create({ httpsAgent });
 
-// RSA Keys
 const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
 const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
 
@@ -108,28 +99,20 @@ function convertToAppHash(plainPassword) {
     return crypto.createHash('sha256').update(plainPassword + DART_CLIENT_SALT).digest('hex');
 }
 
-// ====================================================================
-//  ⏰ AUTO-PING (PREVENT SLEEP) - Runs every 12 Minutes
-// ====================================================================
 const RENDER_URL = 'https://ai-tollgate-surveillance-1.onrender.com';
 
 function autoPing() {
-    console.log(`🔄 Auto-Ping: Keeping server alive... (${new Date().toISOString()})`);
+    console.log(`Auto-Ping: Keeping server alive... (${new Date().toISOString()})`);
     https.get(RENDER_URL, (res) => {
-        // Just consume the response to keep connection active
         res.on('data', () => {}); 
         res.on('end', () => {});
     }).on('error', (err) => {
-        console.error(`⚠️ Auto-Ping Failed: ${err.message}`);
+        console.error(`Auto-Ping Failed: ${err.message}`);
     });
 }
 
-// 12 Minutes Interval (12 * 60 * 1000 ms)
 setInterval(autoPing, 12 * 60 * 1000);
 
-// ====================================================================
-//  💾 AUTOMATED BACKUP & SAFETY NET
-// ====================================================================
 async function performBackup() {
     try {
         const backupDir = path.join(__dirname, 'backups');
@@ -149,7 +132,7 @@ async function performBackup() {
         
         const files = fs.readdirSync(backupDir);
         if (files.length > 7) fs.unlinkSync(path.join(backupDir, files[0]));
-    } catch (err) { console.error("❌ Backup Failed:", err); }
+    } catch (err) { console.error("Backup Failed:", err); }
 }
 setInterval(performBackup, 24 * 60 * 60 * 1000);
 
@@ -172,20 +155,16 @@ async function createDefaultAdmin() {
                 lastActive: new Date(),
                 loginTime: new Date()
             });
-            console.log(`✅ Default Admin Created: ${defaultEmail}`);
+            console.log(`Default Admin Created: ${defaultEmail}`);
         }
-    } catch (err) { console.error("❌ Error creating default admin:", err); }
+    } catch (err) { console.error("Error creating default admin:", err); }
 }
 
 connectDB().then(() => { 
     createDefaultAdmin();
-    // Run initial ping 1 minute after start
     setTimeout(autoPing, 60000);
 });
 
-// ====================================================================
-//  WebSocket & Status Logic
-// ====================================================================
 const wss = new WebSocket.Server({ server });
 const activeConnections = new Map();
 const disconnectTimers = new Map();
@@ -240,10 +219,6 @@ setInterval(() => {
     });
 }, 30000);
 
-// ====================================================================
-//  🔐 MIDDLEWARE: AUTH & INACTIVITY CHECK
-// ====================================================================
-
 const verifyToken = async (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) return res.status(403).json({ message: "No token provided" });
@@ -284,10 +259,6 @@ app.get('/api/auth/public-key', (req, res) => {
     if (fs.existsSync(PUBLIC_KEY_PATH)) res.json({ publicKey: fs.readFileSync(PUBLIC_KEY_PATH, 'utf8') });
     else res.status(500).json({ message: "Keys not ready" });
 });
-
-// ====================================================================
-//  USER ROUTES
-// ====================================================================
 
 app.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
@@ -398,10 +369,6 @@ app.delete('/api/users/:userId', verifyToken, verifySuperAdmin, async (req, res)
     } catch (err) { res.status(500).json({ message: "Error deleting user" }); }
 });
 
-// ====================================================================
-//  BLACKLIST & OCR (SECURED + RESTORED FEATURES)
-// ====================================================================
-
 app.post('/api/blacklist', verifyToken, async (req, res) => {
     const { type, number, name, phone_number, crime_involved, owner_name } = req.body;
     const cleaned = number.replace(/\s|-/g, '').toUpperCase();
@@ -482,6 +449,21 @@ app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (r
     }
 });
 
+const FACE_API_URL = 'https://Face-suveillance-api-777302308889.asia-south1.run.app';
+
+app.get('/api/suspects', verifyToken, async (req, res) => {
+    try {
+        const response = await axiosClient.get(`${FACE_API_URL}/list_suspects`);
+        res.json(response.data);
+    } catch (err) {
+        console.error("Error proxying suspect list:", err.message);
+        if (err.response) {
+            return res.status(err.response.status).json({ message: "Error from Face API provider" });
+        }
+        res.status(500).json({ message: "Internal Server Error fetching suspects" });
+    }
+});
+
 app.post('/api/admin/bulk-dl', verifyToken, verifySuperAdmin, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: "Upload CSV" });
     const results = [];
@@ -538,7 +520,6 @@ app.post('/api/ocr/rc', upload.single('rcImage'), async (req, res) => {
     finally { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
 });
 
-// ✅ 7. Verify Endpoint with "3 Vehicles in 2 Days" Logic
 app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { name: 'dlImage', maxCount: 1 }, { name: 'rcImage', maxCount: 1 }]), async (req, res) => {
     const { dl_number, rc_number, location, tollgate } = req.body;
     const driverImage = req.files && req.files['driverImage'] ? req.files['driverImage'][0] : null;
@@ -625,13 +606,22 @@ app.get('/api/dl-usage/:dl_number', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/api/logs', async (req, res) => {
-    try { const logs = await Log.findAll({ order: [['timestamp', 'DESC']] }); res.json(logs); } 
-    catch (err) { res.status(500).json({ message: "Error fetching logs" }); }
+app.get('/api/logs', verifyToken, verifySuperAdmin, async (req, res) => {
+    try { 
+        const logs = await Log.findAll({ 
+            order: [['timestamp', 'DESC']],
+            limit: 500 
+        }); 
+        res.json(logs); 
+    } 
+    catch (err) { 
+        console.error("Error fetching logs:", err);
+        res.status(500).json({ message: "Error fetching logs" }); 
+    }
 });
 
 app.post('/api/status/inactive', (req, res) => { res.status(200).send('OK'); });
 
 server.listen(port, () => {
-    console.log(`🌐 Netra Sarathi Secure Server Running on Port: ${port}`);
+    console.log(`Netra Sarathi Secure Server Running on Port: ${port}`);
 });
