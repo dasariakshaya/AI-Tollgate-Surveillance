@@ -15,7 +15,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
 const helmet = require('helmet'); 
 const rateLimit = require('express-rate-limit');
-const { exec } = require('child_process'); 
 const { User, License, RC, Log, connectDB, Op } = require('./db');
 
 const app = express();
@@ -69,6 +68,45 @@ function getRequestSource(req) {
     }
     return 'Web Portal';
 }
+
+// ====================================================================
+// 📝 CUSTOM DEBUG LOGGER (Time, Source, Error Reason)
+// ====================================================================
+const LOG_FILE_PATH = path.join(__dirname, 'server_debug.log');
+
+const debugLogger = (req, res, next) => {
+    const start = Date.now();
+    const source = getRequestSource(req);
+    const originalSend = res.send;
+
+    res.send = function (body) {
+        const duration = Date.now() - start;
+        const status = res.statusCode;
+        let failureReason = '';
+
+        if (status >= 400) {
+            try {
+                const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+                failureReason = parsed.message || parsed.error || JSON.stringify(parsed);
+            } catch (e) {
+                failureReason = body; 
+            }
+        }
+
+        const timestamp = new Date().toISOString();
+        const logLine = `[${timestamp}] | SOURCE: ${source} | ${req.method} ${req.originalUrl} | STATUS: ${status} | TIME: ${duration}ms | ${status >= 400 ? `❌ FAILED: ${failureReason}` : '✅ SUCCESS'}\n`;
+
+        fs.appendFile(LOG_FILE_PATH, logLine, (err) => {
+            if (err) console.error("Logging failed:", err);
+        });
+
+        return originalSend.call(this, body);
+    };
+
+    next();
+};
+
+app.use(debugLogger);
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -405,51 +443,7 @@ app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     } catch(err) { res.status(500).json({message: "Error updating status"}); }
 });
 
-app.post('/api/blacklist/suspect', verifyToken, upload.single('photo'), async (req, res) => {
-    const { name } = req.body;
-    const photo = req.file;
-
-    if (!name || !photo) {
-        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
-        return res.status(400).json({ message: 'Suspect name and photo are required.' });
-    }
-
-    const faceApiPath = path.join(__dirname, '..', 'face_recognition_api');
-    
-    if (!fs.existsSync(faceApiPath)) {
-        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
-        return res.status(500).json({ message: "Face recognition system not found on server." });
-    }
-    
-    const knownFacesDir = path.join(faceApiPath, 'app', 'known_faces');
-    const suspectDirName = name.trim().replace(/\s+/g, '_');
-    const suspectDirPath = path.join(knownFacesDir, suspectDirName);
-
-    try {
-        if (!fs.existsSync(suspectDirPath)) fs.mkdirSync(suspectDirPath, { recursive: true });
-
-        const fileExtension = path.extname(photo.originalname) || '.jpg';
-        const newPhotoName = `${suspectDirName}_${Date.now()}${fileExtension}`;
-        const newPhotoPath = path.join(suspectDirPath, newPhotoName);
-        
-        fs.renameSync(photo.path, newPhotoPath);
-
-        const buildScriptPath = path.join(faceApiPath, 'tools', 'build_embeddings.py');
-        exec(`python "${buildScriptPath}"`, { cwd: faceApiPath }, (error, stdout, stderr) => {
-            if (error) console.error(`Build Script Error: ${error.message}`);
-            else console.log(`Model Updated: ${stdout}`);
-        });
-
-        res.status(201).json({ message: `Suspect '${name}' added. Model updating in background.` });
-
-    } catch (err) {
-        console.error("Error adding suspect:", err);
-        if (photo && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
-        res.status(500).json({ message: "Server error processing photo." });
-    }
-});
-
-const FACE_API_URL = 'https://Face-suveillance-api-777302308889.asia-south1.run.app';
+const FACE_API_URL = 'https://face-surveillance-api-777302308889.asia-south1.run.app';
 
 app.get('/api/suspects', verifyToken, async (req, res) => {
     try {
@@ -461,6 +455,49 @@ app.get('/api/suspects', verifyToken, async (req, res) => {
             return res.status(err.response.status).json({ message: "Error from Face API provider" });
         }
         res.status(500).json({ message: "Internal Server Error fetching suspects" });
+    }
+});
+
+app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file || !req.body.person_name) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(400).json({message: "person_name and file are required"});
+        }
+        
+        const form = new FormData();
+        form.append('person_name', req.body.person_name);
+        form.append('file', fs.createReadStream(req.file.path)); 
+        
+        const response = await axiosClient.post(`${FACE_API_URL}/add_suspect`, form, {
+            headers: { ...form.getHeaders() }
+        });
+        
+        fs.unlinkSync(req.file.path); 
+        res.json(response.data);
+    } catch (err) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        console.error("Error adding suspect:", err.message);
+        if (err.response) {
+            return res.status(err.response.status).json({ message: "Error from Face API provider" });
+        }
+        res.status(500).json({ message: "Internal Server Error adding suspect" });
+    }
+});
+
+app.post('/api/suspects/delete', verifyToken, async (req, res) => {
+    try {
+        const { person_name } = req.body;
+        if (!person_name) return res.status(400).json({ message: "person_name is required" });
+
+        const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, { person_name });
+        res.json(response.data);
+    } catch (err) {
+        console.error("Error deleting suspect:", err.message);
+        if (err.response) {
+            return res.status(err.response.status).json({ message: "Error from Face API provider" });
+        }
+        res.status(500).json({ message: "Internal Server Error deleting suspect" });
     }
 });
 
