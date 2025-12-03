@@ -21,7 +21,20 @@ const app = express();
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
+// 1. HELMET (Standard Security Headers)
 app.use(helmet());
+
+// ====================================================================
+// 🛑 FIREWALL MIDDLEWARE (PREVENTS ACCESS TO SENSITIVE FILES)
+// ====================================================================
+app.use((req, res, next) => {
+    // Block requests for sensitive file extensions immediately
+    if (req.path.match(/\.(log|env|pem|json)$/i)) {
+        console.warn(`⚠️ Blocked attempt to access system file: ${req.path} from ${req.ip}`);
+        return res.status(403).send('Forbidden: Access Denied');
+    }
+    next();
+});
 
 const allowedOrigins = [
     process.env.APP_URL, 
@@ -70,15 +83,19 @@ function getRequestSource(req) {
 }
 
 // ====================================================================
-// 📝 CUSTOM DEBUG LOGGER (Time, Source, Error Reason)
+// 📝 SECURE DEBUG LOGGER
 // ====================================================================
-const LOG_FILE_PATH = path.join(__dirname, 'server_debug.log');
+// Store logs in a dedicated folder, not root
+const LOG_DIR = path.join(__dirname, 'logs');
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
+const LOG_FILE_PATH = path.join(LOG_DIR, 'server_debug.log');
 
 const debugLogger = (req, res, next) => {
     const start = Date.now();
     const source = getRequestSource(req);
     const originalSend = res.send;
 
+    // Intercept response to log the outcome
     res.send = function (body) {
         const duration = Date.now() - start;
         const status = res.statusCode;
@@ -89,13 +106,15 @@ const debugLogger = (req, res, next) => {
                 const parsed = typeof body === 'string' ? JSON.parse(body) : body;
                 failureReason = parsed.message || parsed.error || JSON.stringify(parsed);
             } catch (e) {
-                failureReason = body; 
+                failureReason = 'Error details not parseable'; 
             }
         }
 
         const timestamp = new Date().toISOString();
+        // Log Format: [Time] | [Source] | [Method] [Url] | [Status] | [Duration] | [Outcome]
         const logLine = `[${timestamp}] | SOURCE: ${source} | ${req.method} ${req.originalUrl} | STATUS: ${status} | TIME: ${duration}ms | ${status >= 400 ? `❌ FAILED: ${failureReason}` : '✅ SUCCESS'}\n`;
 
+        // Write safely to the hidden logs folder
         fs.appendFile(LOG_FILE_PATH, logLine, (err) => {
             if (err) console.error("Logging failed:", err);
         });
@@ -498,6 +517,31 @@ app.post('/api/suspects/delete', verifyToken, async (req, res) => {
             return res.status(err.response.status).json({ message: "Error from Face API provider" });
         }
         res.status(500).json({ message: "Internal Server Error deleting suspect" });
+    }
+});
+
+app.post('/api/recognize', verifyToken, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: "Image required" });
+        }
+        
+        const form = new FormData();
+        form.append('file', fs.createReadStream(req.file.path)); 
+        
+        const response = await axiosClient.post(`${FACE_API_URL}/recognize`, form, {
+            headers: { ...form.getHeaders() }
+        });
+        
+        fs.unlinkSync(req.file.path); 
+        res.json(response.data);
+    } catch (err) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        console.error("Error recognizing face:", err.message);
+        if (err.response) {
+            return res.status(err.response.status).json({ message: "Error from Face API provider" });
+        }
+        res.status(500).json({ message: "Internal Server Error during recognition" });
     }
 });
 
