@@ -509,11 +509,23 @@ app.post('/api/suspects/delete', verifyToken, async (req, res) => {
         const { person_name } = req.body;
         if (!person_name) return res.status(400).json({ message: "person_name is required" });
 
-        const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, { person_name });
+        // 1. Convert JSON to Form Data format
+        const formData = new URLSearchParams();
+        formData.append('person_name', person_name);
+
+        // 2. Send with the correct headers
+        const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, formData, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
         res.json(response.data);
+
     } catch (err) {
         console.error("Error deleting suspect:", err.message);
+        
+        // Detailed error logging to see exactly what Python complained about
         if (err.response) {
+            console.error("Python Error Details:", JSON.stringify(err.response.data));
             return res.status(err.response.status).json({ message: "Error from Face API provider" });
         }
         res.status(500).json({ message: "Internal Server Error deleting suspect" });
