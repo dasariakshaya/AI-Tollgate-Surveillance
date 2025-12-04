@@ -62,9 +62,10 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
+// ✅ SECRETS NOW LOADED FROM .ENV
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
-const DART_CLIENT_SALT = "Abra_Ca_Dabra!_@616D7269736861@_#Khulja_Sim_Sim#_!@#"; 
+const DART_CLIENT_SALT = process.env.DART_CLIENT_SALT; // Updated Line
 const INACTIVITY_LIMIT = 60 * 60 * 1000; 
 
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
@@ -85,7 +86,6 @@ function getRequestSource(req) {
 // ====================================================================
 // 📝 SECURE DEBUG LOGGER
 // ====================================================================
-// Store logs in a dedicated folder, not root
 const LOG_DIR = path.join(__dirname, 'logs');
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 const LOG_FILE_PATH = path.join(LOG_DIR, 'server_debug.log');
@@ -95,7 +95,6 @@ const debugLogger = (req, res, next) => {
     const source = getRequestSource(req);
     const originalSend = res.send;
 
-    // Intercept response to log the outcome
     res.send = function (body) {
         const duration = Date.now() - start;
         const status = res.statusCode;
@@ -111,10 +110,8 @@ const debugLogger = (req, res, next) => {
         }
 
         const timestamp = new Date().toISOString();
-        // Log Format: [Time] | [Source] | [Method] [Url] | [Status] | [Duration] | [Outcome]
         const logLine = `[${timestamp}] | SOURCE: ${source} | ${req.method} ${req.originalUrl} | STATUS: ${status} | TIME: ${duration}ms | ${status >= 400 ? `❌ FAILED: ${failureReason}` : '✅ SUCCESS'}\n`;
 
-        // Write safely to the hidden logs folder
         fs.appendFile(LOG_FILE_PATH, logLine, (err) => {
             if (err) console.error("Logging failed:", err);
         });
@@ -133,8 +130,12 @@ const loginLimiter = rateLimit({
     message: "Too many login attempts, please try again later."
 });
 
+// ✅ SECURITY UPDATE: Timeout added
 const httpsAgent = new https.Agent({ keepAlive: true });
-const axiosClient = axios.create({ httpsAgent });
+const axiosClient = axios.create({ 
+    httpsAgent,
+    timeout: 30000 // 30 Seconds Timeout
+});
 
 const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
 const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
@@ -462,7 +463,8 @@ app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     } catch(err) { res.status(500).json({message: "Error updating status"}); }
 });
 
-const FACE_API_URL = 'https://face-surveillance-api-777302308889.asia-south1.run.app';
+// ✅ GET SUSPECTS PROXY
+const FACE_API_URL = process.env.PYTHON_FACE_SERVICE_URL; // Using ENV now
 
 app.get('/api/suspects', verifyToken, async (req, res) => {
     try {
@@ -477,6 +479,7 @@ app.get('/api/suspects', verifyToken, async (req, res) => {
     }
 });
 
+// ✅ ADD SUSPECT PROXY
 app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file || !req.body.person_name) {
@@ -504,34 +507,30 @@ app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, re
     }
 });
 
+// ✅ DELETE SUSPECT PROXY
 app.post('/api/suspects/delete', verifyToken, async (req, res) => {
     try {
         const { person_name } = req.body;
         if (!person_name) return res.status(400).json({ message: "person_name is required" });
 
-        // 1. Convert JSON to Form Data format
         const formData = new URLSearchParams();
         formData.append('person_name', person_name);
 
-        // 2. Send with the correct headers
         const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, formData, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
         res.json(response.data);
-
     } catch (err) {
         console.error("Error deleting suspect:", err.message);
-        
-        // Detailed error logging to see exactly what Python complained about
         if (err.response) {
-            console.error("Python Error Details:", JSON.stringify(err.response.data));
             return res.status(err.response.status).json({ message: "Error from Face API provider" });
         }
         res.status(500).json({ message: "Internal Server Error deleting suspect" });
     }
 });
 
+// ✅ RECOGNIZE PROXY
 app.post('/api/recognize', verifyToken, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
