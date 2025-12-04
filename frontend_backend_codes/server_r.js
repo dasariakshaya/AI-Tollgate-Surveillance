@@ -66,7 +66,6 @@ const upload = multer({
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
 const DART_CLIENT_SALT = process.env.DART_CLIENT_SALT; 
-const INACTIVITY_LIMIT = 60 * 60 * 1000; 
 
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
 
@@ -81,6 +80,16 @@ function getRequestSource(req) {
         return 'Mobile App';
     }
     return 'Web Portal';
+}
+
+// ====================================================================
+// 🕒 DAY / NIGHT LOGIC HELPER
+// ====================================================================
+function isDayTime(dateObj = new Date()) {
+    // India Time (IST) is handled by server time usually, but ensuring hour logic
+    const hour = dateObj.getHours();
+    // Day is 06:00 (inclusive) to 18:00 (exclusive)
+    return hour >= 6 && hour < 18;
 }
 
 // ====================================================================
@@ -130,11 +139,11 @@ const loginLimiter = rateLimit({
     message: "Too many login attempts, please try again later."
 });
 
-// ✅ SECURITY: Timeout added (30s)
+// ✅ SECURITY: Base Timeout 60s
 const httpsAgent = new https.Agent({ keepAlive: true });
 const axiosClient = axios.create({ 
     httpsAgent,
-    timeout: 30000 
+    timeout: 60000 // Default 60s for standard calls
 });
 
 const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
@@ -277,6 +286,9 @@ setInterval(() => {
     });
 }, 30000);
 
+// ====================================================================
+// 🔐 MIDDLEWARE: AUTH & DYNAMIC INACTIVITY CHECK
+// ====================================================================
 const verifyToken = async (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) return res.status(403).json({ message: "No token provided" });
@@ -289,10 +301,20 @@ const verifyToken = async (req, res, next) => {
         const user = await User.findByPk(decoded.id);
         if (!user) return res.status(401).json({ message: "User not found" });
 
-        const lastActiveTime = new Date(user.lastActive).getTime();
-        const currentTime = new Date().getTime();
+        const lastActiveTime = new Date(user.lastActive);
+        const currentTime = new Date();
 
-        if ((currentTime - lastActiveTime) > INACTIVITY_LIMIT) {
+        // 🌗 DYNAMIC INACTIVITY LOGIC
+        // Logic: If CURRENT time is Day OR LAST ACTIVE was Day, use Day limits.
+        // This satisfies "during changes from day to night... day time expiry considered".
+        const isDayNow = isDayTime(currentTime);
+        const wasDayThen = isDayTime(lastActiveTime);
+        const useDayRules = isDayNow || wasDayThen;
+
+        // Day: 30 mins (30*60*1000), Night: 15 mins (15*60*1000)
+        const limit = useDayRules ? (30 * 60 * 1000) : (15 * 60 * 1000);
+
+        if ((currentTime.getTime() - lastActiveTime.getTime()) > limit) {
             await User.update({ isActive: false }, { where: { id: user.id } });
             return res.status(401).json({ message: "Session expired due to inactivity. Please login again." });
         }
@@ -345,10 +367,14 @@ app.post('/login', loginLimiter, async (req, res) => {
             lastActive: new Date() 
         }, { where: { id: user.id } });
 
+        // 🌗 DYNAMIC JWT EXPIRY
+        // Day: 3 Hours, Night: 45 Minutes
+        const expiryDuration = isDayTime() ? '3h' : '45m';
+
         const token = jwt.sign(
             { id: user.id, role: user.role }, 
             JWT_SECRET, 
-            { expiresIn: '24h' } 
+            { expiresIn: expiryDuration } 
         );
 
         res.json({ message: "Login successful", token, userId: user.id, role: user.role, name: user.name });
@@ -491,9 +517,10 @@ app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, re
         form.append('person_name', req.body.person_name);
         form.append('file', fs.createReadStream(req.file.path)); 
         
-        // Appends '/add_suspect' to the base URL
+        // 🚀 TIMEOUT OVERRIDE: 120 Seconds (2 Minutes) for heavy operation
         const response = await axiosClient.post(`${FACE_API_URL}/add_suspect`, form, {
-            headers: { ...form.getHeaders() }
+            headers: { ...form.getHeaders() },
+            timeout: 120000 
         });
         
         fs.unlinkSync(req.file.path); 
@@ -516,9 +543,10 @@ app.post('/api/suspects/delete', verifyToken, async (req, res) => {
         const formData = new URLSearchParams();
         formData.append('person_name', person_name);
 
-        // Appends '/delete_suspect' to the base URL
+        // 🚀 TIMEOUT OVERRIDE: 120 Seconds (2 Minutes) for heavy operation
         const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, formData, {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 120000 
         });
 
         res.json(response.data);
