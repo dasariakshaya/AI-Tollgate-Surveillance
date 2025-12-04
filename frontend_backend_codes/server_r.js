@@ -62,10 +62,10 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-// ✅ SECRETS NOW LOADED FROM .ENV
+// ✅ SECRETS LOADED FROM .ENV
 const PASSWORD_PEPPER = process.env.PASSWORD_PEPPER;
 const JWT_SECRET = process.env.JWT_SECRET;
-const DART_CLIENT_SALT = process.env.DART_CLIENT_SALT; // Updated Line
+const DART_CLIENT_SALT = process.env.DART_CLIENT_SALT; 
 const INACTIVITY_LIMIT = 60 * 60 * 1000; 
 
 const ALLOWED_DOMAINS = ['netrasarathi.com', 'gmail.com', 'yahoo.com'];
@@ -130,11 +130,11 @@ const loginLimiter = rateLimit({
     message: "Too many login attempts, please try again later."
 });
 
-// ✅ SECURITY UPDATE: Timeout added
+// ✅ SECURITY: Timeout added (30s)
 const httpsAgent = new https.Agent({ keepAlive: true });
 const axiosClient = axios.create({ 
     httpsAgent,
-    timeout: 30000 // 30 Seconds Timeout
+    timeout: 30000 
 });
 
 const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
@@ -463,11 +463,12 @@ app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     } catch(err) { res.status(500).json({message: "Error updating status"}); }
 });
 
-// ✅ GET SUSPECTS PROXY
-const FACE_API_URL = process.env.PYTHON_FACE_SERVICE_URL; // Using ENV now
+// ✅ CONFIG: Use the Base URL from .env
+const FACE_API_URL = process.env.PYTHON_FACE_SERVICE_URL; 
 
 app.get('/api/suspects', verifyToken, async (req, res) => {
     try {
+        // Appends '/list_suspects' to the base URL
         const response = await axiosClient.get(`${FACE_API_URL}/list_suspects`);
         res.json(response.data);
     } catch (err) {
@@ -479,7 +480,6 @@ app.get('/api/suspects', verifyToken, async (req, res) => {
     }
 });
 
-// ✅ ADD SUSPECT PROXY
 app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file || !req.body.person_name) {
@@ -491,6 +491,7 @@ app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, re
         form.append('person_name', req.body.person_name);
         form.append('file', fs.createReadStream(req.file.path)); 
         
+        // Appends '/add_suspect' to the base URL
         const response = await axiosClient.post(`${FACE_API_URL}/add_suspect`, form, {
             headers: { ...form.getHeaders() }
         });
@@ -507,7 +508,6 @@ app.post('/api/suspects/add', verifyToken, upload.single('file'), async (req, re
     }
 });
 
-// ✅ DELETE SUSPECT PROXY
 app.post('/api/suspects/delete', verifyToken, async (req, res) => {
     try {
         const { person_name } = req.body;
@@ -516,6 +516,7 @@ app.post('/api/suspects/delete', verifyToken, async (req, res) => {
         const formData = new URLSearchParams();
         formData.append('person_name', person_name);
 
+        // Appends '/delete_suspect' to the base URL
         const response = await axiosClient.post(`${FACE_API_URL}/delete_suspect`, formData, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
@@ -530,7 +531,6 @@ app.post('/api/suspects/delete', verifyToken, async (req, res) => {
     }
 });
 
-// ✅ RECOGNIZE PROXY
 app.post('/api/recognize', verifyToken, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -540,6 +540,7 @@ app.post('/api/recognize', verifyToken, upload.single('image'), async (req, res)
         const form = new FormData();
         form.append('file', fs.createReadStream(req.file.path)); 
         
+        // Appends '/recognize' to the base URL
         const response = await axiosClient.post(`${FACE_API_URL}/recognize`, form, {
             headers: { ...form.getHeaders() }
         });
