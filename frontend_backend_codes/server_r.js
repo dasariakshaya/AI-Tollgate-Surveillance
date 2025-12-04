@@ -146,6 +146,11 @@ const axiosClient = axios.create({
     timeout: 60000 // Default 60s for standard calls
 });
 
+// ✅ CONFIG: Use the Base URL from .env
+const FACE_API_URL = process.env.PYTHON_FACE_SERVICE_URL; 
+const PYTHON_DL_SERVICE_URL = process.env.PYTHON_DL_SERVICE_URL;
+const PYTHON_ANPR_SERVICE_URL = process.env.PYTHON_ANPR_SERVICE_URL;
+
 const PRIVATE_KEY_PATH = path.join(__dirname, 'private.pem');
 const PUBLIC_KEY_PATH = path.join(__dirname, 'public.pem');
 
@@ -489,9 +494,6 @@ app.put('/api/blacklist/:type/:id', verifyToken, async (req, res) => {
     } catch(err) { res.status(500).json({message: "Error updating status"}); }
 });
 
-// ✅ CONFIG: Use the Base URL from .env
-const FACE_API_URL = process.env.PYTHON_FACE_SERVICE_URL; 
-
 app.get('/api/suspects', verifyToken, async (req, res) => {
     try {
         // Appends '/list_suspects' to the base URL
@@ -641,6 +643,66 @@ app.post('/api/ocr/rc', upload.single('rcImage'), async (req, res) => {
     finally { if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
 });
 
+// ====================================================================
+// 🔍 HELPER FUNCTIONS (RESTORED FROM OLD SERVER, UPDATED FOR SEQUELIZE/PG)
+// ====================================================================
+
+async function getDLData(dlNumberRaw) {
+    if (!dlNumberRaw) return { status: "no_data_provided" };
+    const dlNumber = dlNumberRaw.replace(/\s|-/g, '').toUpperCase();
+    
+    // Using Sequelize findOne (converted from MongoDB findOne)
+    const dl = await License.findOne({ 
+        where: { dl_number: dlNumber } 
+    });
+
+    return dl ? { 
+        status: dl.Verification, 
+        licenseNumber: dl.dl_number, 
+        name: dl.name, 
+        validity: dl.validity || 'Unknown', 
+        phone_number: dl.phone_number 
+    } : { status: "not_found", licenseNumber: dlNumber };
+}
+
+async function getRCData(rcNumberRaw) {
+    if (!rcNumberRaw) return { status: "no_data_provided" };
+    const rcNumber = rcNumberRaw.replace(/\s|-/g, '').toUpperCase();
+    
+    // Using Sequelize findOne
+    const rc = await RC.findOne({ 
+        where: { regn_number: rcNumber } 
+    });
+
+    return rc ? { 
+        status: rc.verification, // Matches 'verification' field in DB
+        regn_number: rc.regn_number,
+        owner_name: rc.owner_name,
+        engine_number: rc.engine_number || 'N/A', 
+        chassis_number: rc.chassis_number || 'N/A',
+        crime_involved: rc.crime_involved 
+    } : { status: "not_found", regn_number: rcNumber };
+}
+
+async function getFaceDataFromPython(imagePath) {
+    try {
+        const form = new FormData();
+        form.append('image', fs.createReadStream(imagePath));
+        
+        // Using axiosClient for security/timeouts (replacing raw axios)
+        // Ensure endpoint is /verify_driver (from old server logic)
+        const response = await axiosClient.post(`${FACE_API_URL}/verify_driver`, form, { headers: form.getHeaders() });
+        return response.data;
+    } catch (error) {
+        console.error(`Error calling Python Face service:`, error.message);
+        return { status: 'SERVICE_UNAVAILABLE', message: 'Face recognition service is down.' };
+    }
+}
+
+// ====================================================================
+// 🛑 MAIN VERIFICATION ENDPOINT
+// ====================================================================
+
 app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { name: 'dlImage', maxCount: 1 }, { name: 'rcImage', maxCount: 1 }]), async (req, res) => {
     const { dl_number, rc_number, location, tollgate } = req.body;
     const driverImage = req.files && req.files['driverImage'] ? req.files['driverImage'][0] : null;
@@ -660,14 +722,31 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
             tollgate: tollgate || 'Unknown' 
         };
         
-        if (dlData) { logEntry.dl_number = dlData.licenseNumber; logEntry.dl_status = dlData.status; }
-        if (rcData) { logEntry.vehicle_number = rcData.regn_number; logEntry.rc_status = rcData.status; }
-        if (driverData) { logEntry.driver_status = driverData.status; logEntry.driver_name = driverData.name; }
+        if (dlData) { 
+            logEntry.dl_number = dlData.licenseNumber; 
+            logEntry.dl_status = dlData.status; 
+            if(dlData.name) logEntry.name = dlData.name; // Store name if available
+        }
         
+        if (rcData) { 
+            logEntry.vehicle_number = rcData.regn_number; 
+            logEntry.rc_status = rcData.status;
+            // Add extended vehicle details if available in DB model
+            if(rcData.owner_name) logEntry.owner_name = rcData.owner_name;
+            if(rcData.crime_involved) logEntry.crime_involved = rcData.crime_involved;
+        }
+        
+        if (driverData) { 
+            logEntry.driver_status = driverData.status; 
+            logEntry.driver_name = driverData.name; 
+        }
+        
+        // Log to database
         if (Object.keys(logEntry).length > 4) await Log.create(logEntry);
 
         let suspicious = (dlData?.status === 'blacklisted' || rcData?.status === 'blacklisted');
 
+        // Logic Check: DL used on multiple vehicles recently
         if (!suspicious && dlData && dlData.status !== 'blacklisted' && dlData.licenseNumber) {
             const twoDaysAgo = new Date();
             twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
@@ -695,6 +774,22 @@ app.post('/api/verify', upload.fields([{ name: 'driverImage', maxCount: 1 }, { n
                     suspicious: true
                 });
             }
+        }
+        
+        // Suspicious Driver Alert Log
+        if (driverData?.status === 'ALERT') {
+            suspicious = true;
+            await Log.create({
+                timestamp: new Date(),
+                vehicle_number: rcData?.regn_number || null,
+                dl_number: dlData?.licenseNumber || null,
+                alert_type: 'Suspect Driver Identified',
+                description: `Suspected person ${driverData.name} was identified driving vehicle.`,
+                location: location || 'Unknown',
+                tollgate: tollgate || 'Unknown',
+                scanned_by: 'System Alert',
+                suspicious: true
+            });
         }
 
         res.json({ dlData, rcData, driverData, suspicious });
